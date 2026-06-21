@@ -271,6 +271,12 @@ export const zhHant: TranslationStructure = {
     },
 
     session: {
+        attach: '加入附件',
+        attachPhoto: '相片',
+        attachDocument: '檔案',
+        attachmentUploading: '上傳中…',
+        attachmentFailed: '檔案上傳失敗',
+        attachmentTooLarge: ({ max }: { max: string }) => `檔案過大（上限 ${max}）`,
         inputPlaceholder: '輸入訊息...',
         inactiveArchived: '此會話處於非活動狀態。',
         resumeFromTerminal: '若要從終端恢復它：',

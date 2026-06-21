@@ -272,6 +272,12 @@ export const ja: TranslationStructure = {
     },
 
     session: {
+        attach: 'ファイルを添付',
+        attachPhoto: '写真',
+        attachDocument: 'ドキュメント',
+        attachmentUploading: 'アップロード中…',
+        attachmentFailed: 'ファイルのアップロードに失敗しました',
+        attachmentTooLarge: ({ max }: { max: string }) => `ファイルが大きすぎます（最大 ${max}）`,
         inputPlaceholder: 'メッセージを入力...',
         inactiveArchived: 'このセッションは非アクティブです。',
         resumeFromTerminal: 'ターミナルから再開するには:',

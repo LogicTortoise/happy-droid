@@ -271,6 +271,12 @@ export const ca: TranslationStructure = {
     },
 
     session: {
+        attach: 'Adjunta un fitxer',
+        attachPhoto: 'Foto',
+        attachDocument: 'Document',
+        attachmentUploading: 'Pujant…',
+        attachmentFailed: "No s'ha pogut pujar el fitxer",
+        attachmentTooLarge: ({ max }: { max: string }) => `El fitxer és massa gran (màx. ${max})`,
         inputPlaceholder: 'Escriu un missatge...',
         inactiveArchived: 'Aquesta sessió està inactiva.',
         resumeFromTerminal: 'Per reprendre-la des del terminal:',

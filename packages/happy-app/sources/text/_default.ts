@@ -269,6 +269,12 @@ export const en = {
     },
 
     session: {
+        attach: 'Attach file',
+        attachPhoto: 'Photo',
+        attachDocument: 'Document',
+        attachmentUploading: 'Uploading…',
+        attachmentFailed: 'Failed to upload file',
+        attachmentTooLarge: ({ max }: { max: string }) => `File is too large (max ${max})`,
         inputPlaceholder: 'Type a message ...',
         inactiveArchived: 'This session is inactive.',
         resumeFromTerminal: 'To resume it from the terminal:',

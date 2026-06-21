@@ -377,6 +377,12 @@ export const ru: TranslationStructure = {
     },
 
     session: {
+        attach: 'Прикрепить файл',
+        attachPhoto: 'Фото',
+        attachDocument: 'Документ',
+        attachmentUploading: 'Загрузка…',
+        attachmentFailed: 'Не удалось загрузить файл',
+        attachmentTooLarge: ({ max }: { max: string }) => `Файл слишком большой (макс. ${max})`,
         inputPlaceholder: 'Введите сообщение...',
         inactiveArchived: 'Эта сессия неактивна.',
         resumeFromTerminal: 'Чтобы возобновить её из терминала:',

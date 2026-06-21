@@ -269,6 +269,12 @@ export const it: TranslationStructure = {
     },
 
     session: {
+        attach: 'Allega file',
+        attachPhoto: 'Foto',
+        attachDocument: 'Documento',
+        attachmentUploading: 'Caricamento…',
+        attachmentFailed: 'Caricamento del file non riuscito',
+        attachmentTooLarge: ({ max }: { max: string }) => `File troppo grande (max ${max})`,
         inputPlaceholder: 'Scrivi un messaggio ...',
         inactiveArchived: 'Questa sessione è inattiva.',
         resumeFromTerminal: 'Per riprenderla dal terminale:',

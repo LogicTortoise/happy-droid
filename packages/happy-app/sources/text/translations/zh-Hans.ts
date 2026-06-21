@@ -272,6 +272,12 @@ export const zhHans: TranslationStructure = {
     },
 
     session: {
+        attach: '添加附件',
+        attachPhoto: '照片',
+        attachDocument: '文件',
+        attachmentUploading: '上传中…',
+        attachmentFailed: '文件上传失败',
+        attachmentTooLarge: ({ max }: { max: string }) => `文件过大（上限 ${max}）`,
         inputPlaceholder: '输入消息...',
         inactiveArchived: '此会话处于非活动状态。',
         resumeFromTerminal: '要从终端恢复它：',

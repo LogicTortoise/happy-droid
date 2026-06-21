@@ -271,6 +271,12 @@ export const es: TranslationStructure = {
     },
 
     session: {
+        attach: 'Adjuntar archivo',
+        attachPhoto: 'Foto',
+        attachDocument: 'Documento',
+        attachmentUploading: 'Subiendo…',
+        attachmentFailed: 'Error al subir el archivo',
+        attachmentTooLarge: ({ max }: { max: string }) => `El archivo es demasiado grande (máx. ${max})`,
         inputPlaceholder: 'Escriba un mensaje ...',
         inactiveArchived: 'Esta sesión está inactiva.',
         resumeFromTerminal: 'Para reanudarla desde la terminal:',

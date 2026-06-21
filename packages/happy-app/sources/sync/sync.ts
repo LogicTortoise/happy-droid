@@ -40,6 +40,8 @@ import { fetchFeed } from './apiFeed';
 import { FeedItem } from './feedTypes';
 import { UserProfile } from './friendTypes';
 import { resolveMessageModeMeta } from './messageMeta';
+import { MessageAttachment } from './typesMessageMeta';
+import { ATTACHMENT_MAX_BYTES, PickedFile, appendAttachmentMarkers, buildAttachmentBody } from './attachments';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -438,7 +440,26 @@ class Sync {
         this.backgroundSendStartedAt = null;
     }
 
-    async sendMessage(sessionId: string, text: string, displayText?: string) {
+    /**
+     * Upload a locally-picked file as an E2E-encrypted artifact and return a
+     * lightweight reference to attach to a message. See
+     * docs/happy-droid/file-upload.md.
+     */
+    async uploadAttachment(sessionId: string, file: PickedFile): Promise<MessageAttachment> {
+        if (file.size > ATTACHMENT_MAX_BYTES) {
+            throw new Error('Attachment exceeds maximum size');
+        }
+        const body = buildAttachmentBody(file).body;
+        const artifactId = await this.createArtifact(file.name, body, [sessionId], true);
+        return {
+            artifactId,
+            name: file.name,
+            mimeType: file.mimeType,
+            size: file.size,
+        };
+    }
+
+    async sendMessage(sessionId: string, text: string, displayText?: string, attachments?: MessageAttachment[]) {
 
         // Get encryption
         const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -478,12 +499,18 @@ class Sync {
 
         const fallbackModel: string | null = null;
 
+        // Attachments: the actual message text gets runner-readable markers
+        // appended, while the UI keeps showing the user's original text.
+        const hasAttachments = !!attachments && attachments.length > 0;
+        const finalText = hasAttachments ? appendAttachmentMarkers(text, attachments!) : text;
+        const finalDisplayText = displayText ?? (hasAttachments ? text : undefined);
+
         // Create user message content with metadata
         const content: RawRecord = {
             role: 'user',
             content: {
                 type: 'text',
-                text
+                text: finalText
             },
             meta: {
                 sentFrom,
@@ -491,7 +518,8 @@ class Sync {
                 model,
                 fallbackModel,
                 appendSystemPrompt: systemPrompt,
-                ...(displayText && { displayText }) // Add displayText if provided
+                ...(finalDisplayText && { displayText: finalDisplayText }), // Add displayText if provided
+                ...(hasAttachments && { attachments }) // Structured attachment refs
             }
         };
         const encryptedRawRecord = await encryption.encryptRawRecord(content);

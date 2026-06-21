@@ -28,6 +28,9 @@ import { storage, useIsDataReady, useLocalSetting, useRealtimeStatus, useSession
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
+import { MessageAttachment } from '@/sync/typesMessageMeta';
+import { ATTACHMENT_MAX_BYTES, formatBytes, PickedFile } from '@/sync/attachments';
+import { pickDocumentAttachment, pickImageAttachment } from '@/sync/attachmentPicker';
 import { t } from '@/text';
 import { tracking, trackMessageSent } from '@/track';
 import { isRunningOnMac } from '@/utils/platform';
@@ -199,6 +202,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const deviceType = useDeviceType();
     const isTablet = useIsTablet();
     const [message, setMessage] = React.useState('');
+    const [attachments, setAttachments] = React.useState<MessageAttachment[]>([]);
+    const [isUploadingAttachment, setIsUploadingAttachment] = React.useState(false);
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
@@ -368,7 +373,64 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         </>
     ) : null;
 
+    const uploadPickedAttachment = React.useCallback(async (picker: () => Promise<PickedFile | null>) => {
+        try {
+            const picked = await picker();
+            if (!picked) {
+                return;
+            }
+            if (picked.size > ATTACHMENT_MAX_BYTES) {
+                Modal.alert(t('common.error'), t('session.attachmentTooLarge', { max: formatBytes(ATTACHMENT_MAX_BYTES) }));
+                return;
+            }
+            setIsUploadingAttachment(true);
+            const attachment = await sync.uploadAttachment(sessionId, picked);
+            setAttachments(prev => [...prev, attachment]);
+        } catch {
+            Modal.alert(t('common.error'), t('session.attachmentFailed'));
+        } finally {
+            setIsUploadingAttachment(false);
+        }
+    }, [sessionId]);
+
+    const handleAttachPress = React.useCallback(() => {
+        Modal.alert(t('session.attach'), undefined, [
+            { text: t('session.attachPhoto'), onPress: () => { void uploadPickedAttachment(pickImageAttachment); } },
+            { text: t('session.attachDocument'), onPress: () => { void uploadPickedAttachment(pickDocumentAttachment); } },
+            { text: t('common.cancel'), style: 'cancel' },
+        ]);
+    }, [uploadPickedAttachment]);
+
+    const removeAttachment = React.useCallback((artifactId: string) => {
+        setAttachments(prev => prev.filter(a => a.artifactId !== artifactId));
+    }, []);
+
     const composer = (
+        <>
+        {(attachments.length > 0 || isUploadingAttachment) && (
+            <CenteredInputWidth horizontalPadding={sessionInputHorizontalPadding}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 4, paddingBottom: 6 }}>
+                    {attachments.map(a => (
+                        <Pressable
+                            key={a.artifactId}
+                            onPress={() => removeAttachment(a.artifactId)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.colors.surfaceHigh, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 }}
+                        >
+                            <Ionicons name="document-attach-outline" size={14} color={theme.colors.textSecondary} />
+                            <Text style={{ fontSize: 12, color: theme.colors.text }} numberOfLines={1}>{a.name}</Text>
+                            <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{formatBytes(a.size)}</Text>
+                            <Ionicons name="close" size={13} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    ))}
+                    {isUploadingAttachment && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5 }}>
+                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                            <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{t('session.attachmentUploading')}</Text>
+                        </View>
+                    )}
+                </View>
+            </CenteredInputWidth>
+        )}
         <AgentInput
             placeholder={t('session.inputPlaceholder')}
             value={message}
@@ -392,10 +454,12 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             }}
             blockSend={isDisconnected}
             onSend={() => {
-                if (message.trim()) {
+                if (message.trim() || attachments.length > 0) {
+                    const outgoingAttachments = attachments;
                     setMessage('');
+                    setAttachments([]);
                     clearDraft();
-                    sync.sendMessage(sessionId, message);
+                    sync.sendMessage(sessionId, message, undefined, outgoingAttachments.length > 0 ? outgoingAttachments : undefined);
                     trackMessageSent();
                 }
             }}
@@ -404,6 +468,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             onAbort={isDisconnected ? undefined : () => sessionAbort(sessionId)}
             showAbortButton={sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting'}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
+            onAttachPress={isDisconnected ? undefined : handleAttachPress}
             autocompletePrefixes={['@', '/']}
             autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}
             usageData={sessionUsage ? {
@@ -421,6 +486,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             } : undefined}
             alwaysShowContextSize={alwaysShowContextSize}
         />
+        </>
     );
 
     const archivedHint = isInactiveArchivedSession ? (

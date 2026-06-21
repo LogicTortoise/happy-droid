@@ -270,6 +270,12 @@ export const pt: TranslationStructure = {
     },
 
     session: {
+        attach: 'Anexar arquivo',
+        attachPhoto: 'Foto',
+        attachDocument: 'Documento',
+        attachmentUploading: 'Enviando…',
+        attachmentFailed: 'Falha ao enviar o arquivo',
+        attachmentTooLarge: ({ max }: { max: string }) => `Arquivo muito grande (máx. ${max})`,
         inputPlaceholder: 'Digite uma mensagem ...',
         inactiveArchived: 'Esta sessão está inativa.',
         resumeFromTerminal: 'Para retomá-la pelo terminal:',

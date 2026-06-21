@@ -67,6 +67,7 @@ interface AgentInputProps {
     };
     alwaysShowContextSize?: boolean;
     onFileViewerPress?: () => void;
+    onAttachPress?: () => void;
     agentType?: 'claude' | 'codex' | 'gemini' | 'openclaw';
     onAgentClick?: () => void;
     machineName?: string | null;
@@ -1168,6 +1169,31 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
                                 {/* Git Status Badge */}
                                 <GitStatusButton sessionId={props.sessionId} onPress={props.onFileViewerPress} />
+
+                                {/* Attach file button */}
+                                {props.onAttachPress && (
+                                    <Pressable
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                        })}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        onPress={props.onAttachPress}
+                                        accessibilityLabel={t('session.attach')}
+                                    >
+                                        <Ionicons
+                                            name="attach"
+                                            size={18}
+                                            color={theme.colors.button.secondary.tint}
+                                        />
+                                    </Pressable>
+                                )}
                                 </View>
 
                                 {/* Send/Voice button - aligned with first row */}
