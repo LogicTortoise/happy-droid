@@ -239,3 +239,78 @@ ANDROID_HOME=/Users/Hht/Library/Android/sdk \
 结果：BUILD SUCCESSFUL in 34s
 日志：docs/happy-droid/logs/2026-06-23-session-runner-gradle-assembleDebug.log
 ```
+
+## 2026-06-23 - P1 App 自建/列出/切换 Session UI 与同步逻辑
+
+### 范围
+
+- 任务：App 自建/列出/切换 Session 的 UI 与同步逻辑，不依赖绑定 Bot，对接 `sessionRoutes` / `v3SessionRoutes`。
+- 改动范围：`packages/happy-app` 新建 session UI 同步加固、`sync/ops` machine RPC contract 测试、`docs/happy-droid` 文档与验证记录。
+- 未修改线上 `happy-telegram`、上游 `happy`、代理/网络/VPN/Tailscale 配置。
+
+### 实现结论
+
+App 自建 session 的主路径为：
+
+```text
+Android App -> happy-server machine RPC -> selected happy-cli daemon -> agent/Claude
+```
+
+App 列表/切换路径为：
+
+```text
+GET /v1/sessions -> storage.applySessions() -> session list UI -> navigateToSession(sessionId)
+```
+
+App 消息同步路径为：
+
+```text
+POST /v3/sessions/{sessionId}/messages
+GET  /v3/sessions/{sessionId}/messages?after_seq=...
+socket /v1/updates
+```
+
+本轮补强：`spawn-happy-session` 成功返回 `sessionId` 后，新建页最多刷新 5 次 session 列表，确认该 session 已完成本地解密并进入 `storage.sessions`，再设置本地 permission/model、发送首条 prompt 和跳转。这样避免 daemon 已创建 session 但 App 尚未初始化 session data key 时首条消息被跳过。
+
+设计与入口记录：`docs/happy-droid/session-ui-sync.md`。
+
+### 单元/集成测试
+
+```text
+yarn workspace happy-app test sources/sync/ops.spec.ts --run --reporter verbose
+结果：4 tests passed
+日志：docs/happy-droid/logs/2026-06-23-session-ui-sync-vitest.log
+```
+
+覆盖点：
+
+- `machineSpawnNewSession()` 使用 machine RPC `spawn-happy-session`。
+- spawn payload 包含 `type:'spawn-in-directory'`、目录、审批标记、token、agent。
+- optional 字段省略时使用安全默认值。
+- spawn RPC 失败时返回 `{ type:'error' }`。
+- `machineResumeSession()` 使用 machine RPC `resume-happy-session`。
+
+### 静态检查
+
+```text
+yarn workspace happy-app typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-session-ui-sync-typecheck.log
+```
+
+### Android 构建验证
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+
+结果：BUILD SUCCESSFUL in 33s
+日志：docs/happy-droid/logs/2026-06-23-session-ui-sync-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 端到端状态
+
+本轮完成代码级闭环与 Android 构建验证：App 新建 UI -> machine RPC contract -> session 列表刷新等待 -> `/v1/sessions` 本地可见后再发送 `/v3` 首条消息。当前未在本轮启动真实 `happy-cli daemon` 进行人工 App 点击流；真实设备联调的前置条件是同一后端下存在在线 daemon machine。

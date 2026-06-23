@@ -106,9 +106,13 @@
 - **本次实际对齐结论**：本机桥配置未发现未注释的 `HAPPY_TG_SERVER_URL`，因此桥端实际会落到默认 `http://localhost:3005`。本轮选择 App 侧对齐桥端：构建/验证时显式设置 `EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005`，并用单测覆盖 env 与 MMKV override 优先级。若后续桥端显式切到生产 `https://api.cluster-fluster.com`，App 侧也必须同步改为同一 URL。
 - ⚠️ **不一致点（需留意）**：`sources/sync/appConfig.ts:87-89` 另读的是 `EXPO_PUBLIC_SERVER_URL`（少了 `HAPPY_`）。任务规定的变量名是 `EXPO_PUBLIC_HAPPY_SERVER_URL`（与 `serverConfig.ts` 一致）。P0「服务端可配」以 `getServerUrl()` 这条链为准；appConfig 的 `serverUrl` 用途不同，后续若发现冲突需对齐。
 
-### 2.5 Session 模型（客户端）
+### 2.5 Session 模型与 App 自建/列出/切换（客户端）
 - 类型 `sources/sync/storageTypes.ts:87-117`：`id, seq, metadata, agentState, active, presence, todos, draft, permissionMode/modelMode/effortLevel(本地)` 等。
-- **现状：App 不能自建 session**。`new-session` 仅作为服务端更新被动接收（`sources/sync/sync.ts` 处理 `new-session` → invalidate）。可列出/切换/导航，**新建依赖 CLI/桥**。→ P1 要补。
+- **当前 P1 结论**：App 不依赖 Bot/Telegram 桥即可自建、列出、切换 session；前置条件是同一 Happy 后端下有在线的本 fork `happy-cli daemon` machine。具体 UI 与同步链路见 `docs/happy-droid/session-ui-sync.md`。
+- **新建**：`sources/app/(app)/new/index.tsx` 选择 machine/path/worktree/agent/permission/model 后，调用 `machineSpawnNewSession()`；`sources/sync/ops.ts` 通过 encrypted `apiSocket.machineRPC(machineId, 'spawn-happy-session', ...)` 请求 daemon 创建 session。
+- **列出**：`sources/sync/sync.ts` 的 `fetchSessions()` 调用 `GET /v1/sessions`，解密 metadata/agentState 和 session data key 后 `applySessions()`；`storage.ts` 重建 `sessionListViewData`，供 `SessionsList`、active sessions、recent sessions 等 UI 消费。
+- **切换**：列表、active group、recent 页面统一经 `useNavigateToSession()` / `navigateToSession(router, sessionId)` 进入 `/(app)/session/{id}`；不需要桥端 chat/session 绑定。
+- **消息同步**：用户消息走 `POST /v3/sessions/{sessionId}/messages`；App 增量拉取走 `GET /v3/sessions/{sessionId}/messages?after_seq=...`；socket `/v1/updates` 的 `new-message`、`new-session`、`update-session` 负责触发刷新。
 
 ### 2.6 文件能力（P0 现状与缺口）
 - 已有：会话内文件**查看/浏览 git 文件**（`sources/app/(app)/session/[id]/file.tsx`、`files.tsx`），artifacts CRUD（`sources/sync/apiArtifacts.ts`，REST `/v1/artifacts`）。

@@ -85,6 +85,8 @@ const COMPOSER_SEND_BUTTON_MARGIN_BOTTOM = Math.max(
     Math.round((MULTI_TEXT_INPUT_LINE_HEIGHT + COMPOSER_INPUT_VERTICAL_PADDING * 2 - COMPOSER_SEND_BUTTON_SIZE) / 2),
 );
 const WORKTREE_PATH_DEBOUNCE_MS = 300;
+const SPAWNED_SESSION_REFRESH_ATTEMPTS = 5;
+const SPAWNED_SESSION_REFRESH_DELAY_MS = 500;
 
 function trimPathInput(path: string | null | undefined): string {
     return path?.trim() ?? '';
@@ -103,6 +105,19 @@ function normalizePathForComparison(path: string | null | undefined, homeDir?: s
         return null;
     }
     return trimTrailingPathSeparator(resolveAbsolutePath(trimmed, homeDir));
+}
+
+async function waitForSpawnedSession(sessionId: string): Promise<boolean> {
+    for (let attempt = 0; attempt < SPAWNED_SESSION_REFRESH_ATTEMPTS; attempt += 1) {
+        await sync.refreshSessions();
+        if (storage.getState().sessions[sessionId]) {
+            return true;
+        }
+        if (attempt < SPAWNED_SESSION_REFRESH_ATTEMPTS - 1) {
+            await new Promise((resolve) => setTimeout(resolve, SPAWNED_SESSION_REFRESH_DELAY_MS));
+        }
+    }
+    return false;
 }
 
 function getPermissionStyle(key: string): PermissionStyle | null {
@@ -823,7 +838,10 @@ function NewSessionScreen() {
 
             switch (result.type) {
                 case 'success':
-                    await sync.refreshSessions();
+                    if (!(await waitForSpawnedSession(result.sessionId))) {
+                        Modal.alert(t('common.error'), 'Session was created, but it is not available in this app yet. Refresh sessions and try opening it from the list.');
+                        return;
+                    }
 
                     // Set permission mode and model on the session before sending
                     storage.getState().updateSessionPermissionMode(result.sessionId, currentPermission.key);
