@@ -7806,6 +7806,11 @@ expo-sharing@~55.0.0:
     "@expo/config-types" "^55.0.5"
     "@expo/plist" "^0.5.2"
 
+expo-speech@~55.0.9:
+  version "55.0.14"
+  resolved "https://registry.yarnpkg.com/expo-speech/-/expo-speech-55.0.14.tgz#7722678abc56fe77ff5707b8c5f654c9651f689f"
+  integrity sha512-135FKZt1KZ9uCZdKjXQBbXyU5RHssYv+4Xxxy1wkENBHvgmnNTMOKRj+drXPmkCqsJWIVNTY6PmksUwjw2PcSQ==
+
 expo-splash-screen@~55.0.0:
   version "55.0.12"
   resolved "https://registry.yarnpkg.com/expo-splash-screen/-/expo-splash-screen-55.0.12.tgz#13bb6ecd57e15b9f6a9c8687d9456095ce5d0661"

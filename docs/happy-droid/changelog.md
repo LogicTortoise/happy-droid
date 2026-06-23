@@ -6,6 +6,7 @@
 ## [Unreleased]
 
 ### Added
+- **语音模式客户端（P1）**：App 新增 Android Voice Mode 本地开关，使用系统 STT 进行语音输入，并通过系统 TTS 朗读新到达的 agent 文本回复；保留未启用时原 ElevenLabs realtime 语音行为。
 - **自建/列出/切换 Session UI 与同步逻辑（P1）**：确认 App 不依赖 Bot，通过 `happy-cli daemon` machine RPC 自建 session，使用 `/v1/sessions` 与 `/v3/sessions/{id}/messages` 完成列表、切换与消息同步，并补充新建后等待本地 session 可用的同步加固和 RPC contract 测试。
 - **自建 Session runner 设计（P1）**：明确 App 新建 session 由本 fork `happy-cli daemon` 作为 machine runner 执行 Claude/agent，对比自建轻量 runner 与线上桥复用方案，并记录责任边界与落地路径。
 - **服务端地址可配核验（P0）**：确认 App 端 `EXPO_PUBLIC_HAPPY_SERVER_URL` / `serverConfig.ts` 是同步、认证、REST 与 socket 的权威后端地址链路；本机桥端默认 `http://localhost:3005`，App 构建验证已显式对齐同一 URL，并新增 `serverConfig` 优先级单测。

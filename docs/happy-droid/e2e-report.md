@@ -314,3 +314,90 @@ APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
 ### 端到端状态
 
 本轮完成代码级闭环与 Android 构建验证：App 新建 UI -> machine RPC contract -> session 列表刷新等待 -> `/v1/sessions` 本地可见后再发送 `/v3` 首条消息。当前未在本轮启动真实 `happy-cli daemon` 进行人工 App 点击流；真实设备联调的前置条件是同一后端下存在在线 daemon machine。
+
+## 2026-06-23 - P1 语音模式客户端实现
+
+### 范围
+
+- 任务：收到 agent 文字回复用 Android TTS 朗读，语音输入用系统 STT，并提供可控开关入口。
+- 改动范围：`packages/happy-app` 客户端、`docs/happy-droid/voice-mode.md`、验证日志。
+- 未修改线上 `happy-telegram`、上游 `happy`、代理/网络/VPN/Tailscale 配置。
+
+### 实现结论
+
+新增本地设备级 `voiceModeEnabled` 开关，入口在 Settings > Voice Assistant：
+
+```text
+Voice Assistant settings -> Android Voice Mode -> Voice Mode switch
+```
+
+启用后：
+
+- 会话页收到新的非 thinking `agent-text` 后，使用 `expo-speech` 调用系统 TTS 朗读。
+- 打开旧 session 或刚打开开关时不会朗读历史消息，只朗读之后新到达的 agent 文本。
+- 会话输入区 mic 按钮在 Android 上改为系统 STT：请求麦克风权限，启动 `android.speech.action.RECOGNIZE_SPEECH`，读取 `android.speech.extra.RESULTS`，并把识别文本填入 composer。
+- 未启用时，mic 按钮保持原有 ElevenLabs realtime voice assistant 行为。
+
+设计说明：`docs/happy-droid/voice-mode.md`。
+
+### 单元测试
+
+```text
+yarn workspace happy-app test sources/voice/voiceMode.spec.ts --run --reporter verbose
+结果：3 tests passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-vitest.log
+```
+
+覆盖点：
+
+- Markdown/code/link 文本清理为适合 TTS 的纯文本。
+- Android `RecognizerIntent` 标准返回 key `android.speech.extra.RESULTS` 可解析为识别文本。
+- 空/无效识别结果返回 `null`。
+
+### 静态检查
+
+```text
+yarn workspace happy-app typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-typecheck.log
+```
+
+### Android 构建验证
+
+```text
+APP_ENV=development npx expo prebuild -p android --no-install
+结果：Finished prebuild
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-expo-prebuild.log
+```
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+
+结果：BUILD SUCCESSFUL in 9m 41s
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+大小：452M
+SHA-256：a0d0850147c6ffc002dfd2393fd63023ec7949d56ae76d718f65a0f40aaa8818
+```
+
+构建日志确认 `expo-speech (55.0.14)` 已进入 Expo autolinking 列表。
+
+### 设备端验证状态
+
+```text
+adb devices
+结果：List of devices attached 为空
+```
+
+当前没有在线 Android 设备/模拟器，因此本轮无法自动执行 APK 安装、打开系统 STT UI、或实听 TTS。已完成可自动化验证：helper 单测、TypeScript 静态检查、Android prebuild、Gradle debug APK 构建。真实设备上的手工验收步骤：
+
+```text
+1. 安装 app-debug.apk。
+2. 打开 Settings > Voice Assistant > Android Voice Mode > Voice Mode。
+3. 进入一个 session，点击输入区 mic，确认系统语音识别 UI 弹出，识别结果填入 composer。
+4. 发送消息并等待 agent 文本回复，确认系统 TTS 朗读新回复。
+5. 关闭 Voice Mode，确认 mic 按钮恢复原 ElevenLabs realtime voice assistant 行为。
+```

@@ -28,6 +28,7 @@ import { storage, useIsDataReady, useLocalSetting, useRealtimeStatus, useSession
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
+import type { Message } from '@/sync/typesMessage';
 import { MessageAttachment } from '@/sync/typesMessageMeta';
 import { ATTACHMENT_MAX_BYTES, formatBytes, PickedFile } from '@/sync/attachments';
 import { pickDocumentAttachment, pickImageAttachment } from '@/sync/attachmentPicker';
@@ -37,6 +38,8 @@ import { isRunningOnMac } from '@/utils/platform';
 import { useDeviceType, useHeaderHeight, useIsLandscape, useIsTablet } from '@/utils/responsive';
 import { formatPathRelativeToHome, getResumeCommandBlock, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
+import { requestAndroidSpeechRecognition } from '@/voice/androidSpeechRecognition';
+import { speakAgentReply, stopSpeechOutput } from '@/voice/speechOutput';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -207,6 +210,10 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
+    const voiceModeEnabled = useLocalSetting('voiceModeEnabled');
+    const [isRecognizingSpeech, setIsRecognizingSpeech] = React.useState(false);
+    const lastSpokenAgentMessageIdRef = React.useRef<string | null>(null);
+    const voiceModeInitializedRef = React.useRef(false);
     const sessionInputHorizontalPadding = Platform.OS === 'web' || isRunningOnMac() || isTablet ? 12 : 8;
 
     // Check if CLI version is outdated and not already acknowledged
@@ -300,8 +307,69 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     }), []);
 
 
+    const handleSystemSpeechInput = React.useCallback(async () => {
+        if (Platform.OS !== 'android' || isRecognizingSpeech) {
+            return;
+        }
+        setIsRecognizingSpeech(true);
+        try {
+            const recognized = await requestAndroidSpeechRecognition('Speak a message');
+            if (recognized) {
+                setMessage((current) => {
+                    const trimmed = current.trim();
+                    return trimmed ? `${trimmed} ${recognized}` : recognized;
+                });
+            }
+        } catch (error) {
+            console.error('Failed to recognize speech:', error);
+            Modal.alert(t('common.error'), 'Speech recognition failed. Please try again.');
+        } finally {
+            setIsRecognizingSpeech(false);
+        }
+    }, [isRecognizingSpeech]);
+
+    React.useEffect(() => {
+        const latestAgentMessage = messages.reduce<Extract<Message, { kind: 'agent-text' }> | null>((latest, item) => {
+            if (item.kind !== 'agent-text' || item.isThinking) {
+                return latest;
+            }
+            if (!latest || item.createdAt > latest.createdAt) {
+                return item;
+            }
+            return latest;
+        }, null);
+
+        if (!voiceModeEnabled) {
+            voiceModeInitializedRef.current = false;
+            lastSpokenAgentMessageIdRef.current = latestAgentMessage?.id ?? null;
+            void stopSpeechOutput();
+            return;
+        }
+
+        if (!voiceModeInitializedRef.current) {
+            voiceModeInitializedRef.current = true;
+            lastSpokenAgentMessageIdRef.current = latestAgentMessage?.id ?? null;
+            return;
+        }
+
+        if (latestAgentMessage && latestAgentMessage.id !== lastSpokenAgentMessageIdRef.current) {
+            lastSpokenAgentMessageIdRef.current = latestAgentMessage.id;
+            void speakAgentReply(latestAgentMessage.text);
+        }
+    }, [messages, voiceModeEnabled]);
+
+    React.useEffect(() => {
+        return () => {
+            void stopSpeechOutput();
+        };
+    }, []);
+
     // Handle microphone button press - memoized to prevent button flashing
     const handleMicrophonePress = React.useCallback(async () => {
+        if (voiceModeEnabled) {
+            await handleSystemSpeechInput();
+            return;
+        }
         if (realtimeStatus === 'connecting') {
             return; // Prevent actions during transitions
         }
@@ -335,13 +403,13 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             // Notify voice assistant about voice session stop
             voiceHooks.onVoiceStopped();
         }
-    }, [realtimeStatus, sessionId]);
+    }, [handleSystemSpeechInput, realtimeStatus, sessionId, voiceModeEnabled]);
 
     // Memoize mic button state to prevent flashing during chat transitions
     const micButtonState = useMemo(() => ({
         onMicPress: handleMicrophonePress,
-        isMicActive: realtimeStatus === 'connected' || realtimeStatus === 'connecting'
-    }), [handleMicrophonePress, realtimeStatus]);
+        isMicActive: voiceModeEnabled ? isRecognizingSpeech : realtimeStatus === 'connected' || realtimeStatus === 'connecting'
+    }), [handleMicrophonePress, isRecognizingSpeech, realtimeStatus, voiceModeEnabled]);
 
     // Trigger session visibility and initialize git status sync
     React.useLayoutEffect(() => {

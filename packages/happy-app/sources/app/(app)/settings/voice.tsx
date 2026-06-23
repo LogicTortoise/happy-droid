@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { Text } from '@/components/StyledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,7 +8,7 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { Switch } from '@/components/Switch';
 import { UsageBar } from '@/components/usage/UsageBar';
-import { useSettingMutable, useEntitlement } from '@/sync/storage';
+import { useSettingMutable, useEntitlement, useLocalSettingMutable } from '@/sync/storage';
 import { useAuth } from '@/auth/AuthContext';
 import { findLanguageByCode, getLanguageDisplayName, LANGUAGES } from '@/constants/Languages';
 import { fetchVoiceUsage, type VoiceUsageResponse } from '@/sync/apiVoice';
@@ -28,6 +28,7 @@ export default React.memo(function VoiceSettingsScreen() {
     const [voiceAssistantLanguage] = useSettingMutable('voiceAssistantLanguage');
     const [voiceCustomAgentId, setVoiceCustomAgentId] = useSettingMutable('voiceCustomAgentId');
     const [voiceBypassToken, setVoiceBypassToken] = useSettingMutable('voiceBypassToken');
+    const [voiceModeEnabled, setVoiceModeEnabled] = useLocalSettingMutable('voiceModeEnabled');
 
     const hasPro = useEntitlement('pro');
 
@@ -106,6 +107,26 @@ export default React.memo(function VoiceSettingsScreen() {
                     />
                 </ItemGroup>
             )}
+
+            <ItemGroup
+                title="Android Voice Mode"
+                footer={Platform.OS === 'android'
+                    ? 'Uses Android speech recognition for dictation and reads new agent text replies with system text-to-speech.'
+                    : 'System STT input is currently available on Android only.'}
+            >
+                <Item
+                    title="Voice Mode"
+                    subtitle={voiceModeEnabled ? 'System STT and TTS replies enabled' : 'Realtime voice assistant remains on the mic button'}
+                    icon={<Ionicons name="mic-outline" size={29} color="#34C759" />}
+                    rightElement={
+                        <Switch
+                            value={voiceModeEnabled}
+                            onValueChange={setVoiceModeEnabled}
+                            disabled={Platform.OS !== 'android'}
+                        />
+                    }
+                />
+            </ItemGroup>
 
             {/* Language Settings */}
             <ItemGroup
