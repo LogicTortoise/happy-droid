@@ -203,3 +203,39 @@ ANDROID_HOME=/Users/Hht/Library/Android/sdk \
 日志：docs/happy-droid/logs/2026-06-23-server-config-gradle-assembleDebug.log
 APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+## 2026-06-23 - P1 自建 Session Runner 关键设计
+
+### 设计结论
+
+App 新建 session 后，跑 Claude 的执行者是本 fork 的 `happy-cli daemon`：
+
+```text
+Android App -> happy-server -> selected machine RPC -> happy-cli daemon -> Claude/Codex/Gemini/OpenClaw
+```
+
+本任务没有改功能代码；新增设计文档 `docs/happy-droid/session-runner.md`，明确：
+
+- 不复用线上 `happy-telegram` 桥，桥只读且绑定 Bot/chat。
+- 不自建轻量 runner 作为主路径，避免重做鉴权、machine 注册、E2E 加密、RPC、v3 回写、权限和文件能力。
+- App 通过现有 `machineSpawnNewSession()` / `spawn-happy-session` 让在线 machine 上的本 fork `happy-cli daemon` 创建并运行 session。
+
+### 静态检查
+
+```text
+yarn workspace happy-app typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-session-runner-typecheck.log
+```
+
+### Android 构建验证
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+
+结果：BUILD SUCCESSFUL in 34s
+日志：docs/happy-droid/logs/2026-06-23-session-runner-gradle-assembleDebug.log
+```

@@ -257,7 +257,7 @@
 | B 自建轻量 runner | 仿 happy-cli 写最小执行器 | 可裁剪，但要重做鉴权/加密/回写，成本高、易踩坑 |
 | C 复用桥 | —— | **禁止**（桥绑 Bot 且只读） |
 
-**落地建议：A**。App 侧需实现 session 列表/新建/切换 UI（§2.5 缺口），新建走 `POST /v1/sessions`；runner 用本 fork happy-cli daemon。具体落地细节后续写入 `docs/happy-droid/*.md`（自建 session 设计文档）。
+**落地建议：A**。App 侧需实现/验收 session 列表/新建/切换 UI（§2.5 缺口），通过 machine RPC `spawn-happy-session` 让本 fork `happy-cli daemon` 创建并运行 session；runner 用本 fork happy-cli daemon。详细方案、对比和责任边界见 `docs/happy-droid/session-runner.md`。
 
 ### 6.4 ⭐ P1 语音模式——感知点在哪
 **两条线分清**：
