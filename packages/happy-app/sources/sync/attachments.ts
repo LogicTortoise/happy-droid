@@ -1,5 +1,6 @@
-import { ArtifactBody } from './artifactTypes';
-import { MessageAttachment } from './typesMessageMeta';
+import type { ArtifactBody } from './artifactTypes';
+import type { Message } from './typesMessage';
+import type { MessageAttachment } from './typesMessageMeta';
 
 /**
  * Maximum attachment size. Files are base64-encoded into an artifact body that
@@ -115,4 +116,133 @@ export function appendAttachmentMarkers(text: string, attachments: MessageAttach
     }
     const markers = attachments.map(formatAttachmentMarker).join('\n');
     return text.trim().length > 0 ? `${text}\n\n${markers}` : markers;
+}
+
+export interface DownloadableFileItem {
+    id: string;
+    source: 'artifact' | 'file-ref';
+    artifactId?: string;
+    ref?: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    image?: {
+        width?: number;
+        height?: number;
+        thumbhash?: string;
+    };
+}
+
+const ATTACHMENT_MARKER_PATTERN = /\[attachment:\s*(.+?)\s*\(([^,]+),\s*([^)]+)\)\s*artifact:([^\]\s]+)\]/g;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isImageMimeType(mimeType: string | null | undefined): boolean {
+    return typeof mimeType === 'string' && mimeType.toLowerCase().startsWith('image/');
+}
+
+export function sanitizeFileName(name: string | null | undefined): string {
+    const cleaned = (name || 'file')
+        .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return cleaned.length > 0 ? cleaned : 'file';
+}
+
+export function normalizeArtifactRef(ref: string | null | undefined): string | null {
+    if (!ref) {
+        return null;
+    }
+    const trimmed = ref.trim();
+    if (trimmed.startsWith('artifact:')) {
+        const artifactId = trimmed.slice('artifact:'.length).trim();
+        return artifactId.length > 0 ? artifactId : null;
+    }
+    return UUID_PATTERN.test(trimmed) ? trimmed : null;
+}
+
+export function extractArtifactRefsFromText(text: string): DownloadableFileItem[] {
+    const items: DownloadableFileItem[] = [];
+    for (const match of text.matchAll(ATTACHMENT_MARKER_PATTERN)) {
+        const [, name, mimeType, sizeLabel, artifactId] = match;
+        items.push({
+            id: `artifact:${artifactId}`,
+            source: 'artifact',
+            artifactId,
+            name: sanitizeFileName(name),
+            mimeType: mimeType || 'application/octet-stream',
+            size: parseSizeLabel(sizeLabel),
+        });
+    }
+    return items;
+}
+
+export function collectMessageDownloads(message: Message): DownloadableFileItem[] {
+    const items: DownloadableFileItem[] = [];
+    const seen = new Set<string>();
+    const add = (item: DownloadableFileItem) => {
+        if (seen.has(item.id)) {
+            return;
+        }
+        seen.add(item.id);
+        items.push(item);
+    };
+
+    const metaAttachments = message.meta?.attachments ?? [];
+    for (const attachment of metaAttachments) {
+        add({
+            id: `artifact:${attachment.artifactId}`,
+            source: 'artifact',
+            artifactId: attachment.artifactId,
+            name: sanitizeFileName(attachment.name),
+            mimeType: attachment.mimeType || 'application/octet-stream',
+            size: attachment.size,
+        });
+    }
+
+    if ((message.kind === 'user-text' || message.kind === 'agent-text') && message.text) {
+        for (const item of extractArtifactRefsFromText(message.text)) {
+            add(item);
+        }
+    }
+
+    if (message.kind === 'tool-call' && message.tool.name === 'file') {
+        const input = message.tool.input ?? {};
+        const ref = typeof input.ref === 'string' ? input.ref : undefined;
+        const artifactId = normalizeArtifactRef(ref);
+        const image = typeof input.image === 'object' && input.image
+            ? {
+                width: typeof input.image.width === 'number' ? input.image.width : undefined,
+                height: typeof input.image.height === 'number' ? input.image.height : undefined,
+                thumbhash: typeof input.image.thumbhash === 'string' ? input.image.thumbhash : undefined,
+            }
+            : undefined;
+        add({
+            id: artifactId ? `artifact:${artifactId}` : `file-ref:${ref || message.id}`,
+            source: artifactId ? 'artifact' : 'file-ref',
+            artifactId: artifactId || undefined,
+            ref,
+            name: sanitizeFileName(typeof input.name === 'string' ? input.name : 'file'),
+            mimeType: typeof input.mimeType === 'string'
+                ? input.mimeType
+                : image ? 'image/*' : 'application/octet-stream',
+            size: typeof input.size === 'number' ? input.size : 0,
+            image,
+        });
+    }
+
+    return items;
+}
+
+function parseSizeLabel(label: string): number {
+    const match = label.trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
+    if (!match) {
+        return 0;
+    }
+    const value = Number(match[1]);
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const power = units.indexOf(match[2].toUpperCase());
+    return power >= 0 ? Math.round(value * Math.pow(1024, power)) : 0;
 }

@@ -1,15 +1,19 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { ActivityIndicator, Modal, Pressable, Image as RNImage, View, Text } from "react-native";
 import { StyleSheet } from 'react-native-unistyles';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
-import { Message, UserTextMessage, AgentTextMessage, ToolCallMessage } from "@/sync/typesMessage";
+import type { Message, UserTextMessage, AgentTextMessage, ToolCallMessage } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
 import { layout } from "./layout";
 import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
+import { Ionicons } from '@expo/vector-icons';
+import { collectMessageDownloads, formatBytes, isImageMimeType } from '@/sync/attachments';
+import type { DownloadableFileItem } from '@/sync/attachments';
+import { useArtifactDownload } from '@/hooks/useArtifactDownload';
 
 
 export const MessageView = (props: {
@@ -77,6 +81,7 @@ function UserTextBlock(props: {
     <View style={styles.userMessageContainer}>
       <View style={styles.userMessageBubble}>
         <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
+        <MessageDownloadList message={props.message} align="right" sessionId={props.sessionId} />
         {/* {__DEV__ && (
           <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
         )} */}
@@ -101,6 +106,7 @@ function AgentTextBlock(props: {
   return (
     <View style={styles.agentMessageContainer}>
       <MarkdownView markdown={props.message.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
+      <MessageDownloadList message={props.message} align="left" sessionId={props.sessionId} />
     </View>
   );
 }
@@ -157,6 +163,13 @@ function ToolCallBlock(props: {
   if (!props.message.tool) {
     return null;
   }
+  if (props.message.tool.name === 'file') {
+    return (
+      <View style={styles.toolContainer}>
+        <MessageDownloadList message={props.message} align="left" sessionId={props.sessionId} />
+      </View>
+    );
+  }
   return (
     <View style={styles.toolContainer}>
       <ToolView
@@ -166,6 +179,89 @@ function ToolCallBlock(props: {
         sessionId={props.sessionId}
         messageId={props.message.id}
       />
+    </View>
+  );
+}
+
+function MessageDownloadList(props: {
+  message: Message;
+  align: 'left' | 'right';
+  sessionId: string;
+}) {
+  const items = React.useMemo(() => collectMessageDownloads(props.message), [props.message]);
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <View style={[styles.downloadList, props.align === 'right' && styles.downloadListRight]}>
+      {items.map((item) => (
+        <DownloadCard item={item} key={item.id} sessionId={props.sessionId} />
+      ))}
+    </View>
+  );
+}
+
+function DownloadCard(props: { item: DownloadableFileItem; sessionId: string }) {
+  const { item } = props;
+  const { state, download, share, canDownload } = useArtifactDownload(item, props.sessionId);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const isImage = state.isImage || isImageMimeType(item.mimeType);
+  const isBusy = state.status === 'downloading';
+  const isSaved = state.status === 'saved' && !!state.uri;
+
+  return (
+    <View style={styles.downloadCard}>
+      <View style={styles.downloadIconBox}>
+        <Ionicons name={isImage ? 'image-outline' : 'document-outline'} size={20} color="#656D76" />
+      </View>
+      <View style={styles.downloadContent}>
+        <Text style={styles.downloadTitle} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.downloadMeta} numberOfLines={1}>
+          {item.mimeType} - {formatBytes(item.size)}
+        </Text>
+        {!canDownload && (
+          <Text style={styles.downloadError} numberOfLines={2}>
+            File ref: {item.ref || 'unavailable'}
+          </Text>
+        )}
+        {state.error && (
+          <Text style={styles.downloadError} numberOfLines={2}>{state.error}</Text>
+        )}
+        {isSaved && state.uri && (
+          <Text style={styles.downloadSaved} numberOfLines={1}>{state.uri}</Text>
+        )}
+        {isSaved && isImage && state.uri && (
+          <Pressable onPress={() => setPreviewOpen(true)} style={styles.previewThumbWrap}>
+            <RNImage source={{ uri: state.uri }} style={styles.previewThumb} resizeMode="cover" />
+          </Pressable>
+        )}
+      </View>
+      <View style={styles.downloadActions}>
+        {!isSaved ? (
+          <Pressable
+            onPress={download}
+            disabled={!canDownload || isBusy}
+            style={[styles.downloadButton, (!canDownload || isBusy) && styles.downloadButtonDisabled]}
+          >
+            {isBusy ? (
+              <ActivityIndicator size="small" color="#656D76" />
+            ) : (
+              <Ionicons name="download-outline" size={18} color={canDownload ? "#11181C" : "#8B949E"} />
+            )}
+          </Pressable>
+        ) : (
+          <Pressable onPress={share} style={styles.downloadButton}>
+            <Ionicons name="share-outline" size={18} color="#11181C" />
+          </Pressable>
+        )}
+      </View>
+      {isSaved && isImage && state.uri && (
+        <Modal visible={previewOpen} transparent animationType="fade" onRequestClose={() => setPreviewOpen(false)}>
+          <Pressable style={styles.previewModal} onPress={() => setPreviewOpen(false)}>
+            <RNImage source={{ uri: state.uri }} style={styles.previewImage} resizeMode="contain" />
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -217,5 +313,94 @@ const styles = StyleSheet.create((theme) => ({
   debugText: {
     color: theme.colors.agentEventText,
     fontSize: 12,
+  },
+  downloadList: {
+    gap: 8,
+    marginTop: 8,
+    alignSelf: 'stretch',
+  },
+  downloadListRight: {
+    alignItems: 'flex-end',
+  },
+  downloadCard: {
+    alignSelf: 'stretch',
+    maxWidth: 360,
+    minWidth: 240,
+    flexDirection: 'row',
+    gap: 10,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.divider,
+    backgroundColor: theme.colors.surface,
+    padding: 10,
+  },
+  downloadIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceHigh,
+  },
+  downloadContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  downloadTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  downloadMeta: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  downloadError: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 6,
+  },
+  downloadSaved: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    marginTop: 6,
+  },
+  downloadActions: {
+    justifyContent: 'flex-start',
+  },
+  downloadButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceHigh,
+  },
+  downloadButtonDisabled: {
+    opacity: 0.55,
+  },
+  previewThumbWrap: {
+    marginTop: 8,
+    width: 160,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surfaceHigh,
+  },
+  previewThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  previewModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.86)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
   },
 }));

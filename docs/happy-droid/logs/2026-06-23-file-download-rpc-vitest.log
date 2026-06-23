@@ -1,0 +1,108 @@
+yarn workspace v1.22.22
+yarn run v1.22.22
+$ vitest sources/sync/attachments.spec.ts sources/sync/fileDownloads.spec.ts sources/sync/typesRaw.spec.ts --run --reporter verbose
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-app
+
+ ✓ sources/sync/attachments.spec.ts > attachments body encode/decode > round-trips a picked file through the artifact body 1ms
+ ✓ sources/sync/attachments.spec.ts > attachments body encode/decode > returns null for a non-attachment body 0ms
+ ✓ sources/sync/attachments.spec.ts > attachments body encode/decode > returns null when the JSON is not a file payload 0ms
+ ✓ sources/sync/attachments.spec.ts > formatBytes > formats across units 0ms
+ ✓ sources/sync/attachments.spec.ts > formatBytes > handles invalid input 0ms
+ ✓ sources/sync/attachments.spec.ts > message markers > formats a single attachment marker referencing the artifact 0ms
+ ✓ sources/sync/attachments.spec.ts > message markers > appends markers after user text with a blank line 0ms
+ ✓ sources/sync/attachments.spec.ts > message markers > uses only markers when there is no user text 0ms
+ ✓ sources/sync/attachments.spec.ts > message markers > returns the original text when there are no attachments 0ms
+ ✓ sources/sync/attachments.spec.ts > download helpers > extracts artifact refs from attachment markers 0ms
+ ✓ sources/sync/attachments.spec.ts > download helpers > sanitizes unsafe file names 0ms
+ ✓ sources/sync/attachments.spec.ts > download helpers > detects image mime types 0ms
+ ✓ sources/sync/attachments.spec.ts > download helpers > normalizes artifact refs 0ms
+ ✓ sources/sync/attachments.spec.ts > download helpers > collects meta attachments and dedupes matching text markers 1ms
+ ✓ sources/sync/attachments.spec.ts > download helpers > collects session file refs separately from artifact refs 0ms
+ ✓ sources/sync/fileDownloads.spec.ts > file download payload loading > loads bytes from an artifact attachment payload 1ms
+ ✓ sources/sync/fileDownloads.spec.ts > file download payload loading > loads bytes for a normal session file ref through readFile RPC 1ms
+ ✓ sources/sync/fileDownloads.spec.ts > file download payload loading > reports file-ref downloadability based on session id and ref 0ms
+ ✓ sources/sync/fileDownloads.spec.ts > file download payload loading > surfaces readFile failures for normal session file refs 1ms
+ ✓ sources/sync/fileDownloads.spec.ts > file download payload loading > covers normal file-ref from message item through local file bytes and image preview eligibility 2ms
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > rejects file events without required size
+Unrecognized message type: session (id: db-file-missing-size)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for non-cuid subagent identifiers
+Unrecognized message type: session (id: db-subagent-invalid)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for malformed session payloads
+Unrecognized message type: session (id: db-8)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for turn-end session events without status
+Unrecognized message type: session (id: db-10)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for service events from user role
+Unrecognized message type: session (id: db-11)
+
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Accepts and transforms hyphenated types > transforms tool-call to tool_use with field remapping 3ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Accepts and transforms hyphenated types > transforms tool-call-result to tool_result with field remapping 1ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Accepts and transforms hyphenated types > preserves unknown fields for future compatibility 1ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Accepts canonical underscore types without transformation (idempotency) > passes through tool_use unchanged 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Accepts canonical underscore types without transformation (idempotency) > passes through tool_result unchanged 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Accepts canonical underscore types without transformation (idempotency) > passes through text content unchanged 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Rejects unknown content types with clear errors > fails validation for unknown type with clear error message 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles mixed hyphenated and canonical in same message > transforms mixed content array correctly 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles mixed hyphenated and canonical in same message > handles tool results with both hyphenated and canonical 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Backwards compatibility with old CLI messages > handles old CLI with canonical underscore types 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Codex/Gemini messages use native hyphenated schema (no transformation) > accepts Codex tool-call messages via codex schema path 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Codex/Gemini messages use native hyphenated schema (no transformation) > accepts Codex tool-call-result messages via codex schema path 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles unexpected data formats gracefully > handles tool-call with both callId and id fields (prefers callId) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles unexpected data formats gracefully > handles tool-call-result with both output and content fields (prefers output) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles unexpected data formats gracefully > handles missing optional is_error field (defaults to false) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles unexpected data formats gracefully > rejects tool-call missing required callId field 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Handles unexpected data formats gracefully > rejects tool_use missing required id field 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Integration: Complete message flow scenarios > handles real Claude SDK assistant message with tool_use 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Integration: Complete message flow scenarios > handles real user message with tool_result 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Integration: Complete message flow scenarios > handles sidechain messages (parent_tool_use_id present) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles tool-call with extra unknown fields from future API 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles empty content array 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles string content in user messages (not array) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles system messages (no transformation needed) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles summary messages 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles event messages (no content transformation) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unexpected data format robustness > handles user role messages with text content 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Field preservation and edge cases > preserves permissions object in tool_result 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Field preservation and edge cases > handles tool_result with array content (text blocks) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Field preservation and edge cases > handles metadata fields (uuid, parentUuid, isSidechain, etc.) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > WOLOG: Cross-agent format handling > Claude SDK (underscore) passes through unchanged 3ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > WOLOG: Cross-agent format handling > Codex (hyphenated via codex path) uses native schema 6ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > WOLOG: Cross-agent format handling > Gemini (uses codex path) works with hyphenated types 12ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > WOLOG: Cross-agent format handling > handles hypothetical hyphenated types in output path (defensive) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Regression prevention: Ensure existing behavior unchanged > Zod transform produces same output as old preprocessing for canonical types 3ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Regression prevention: Ensure existing behavior unchanged > Zod transform is idempotent (applying twice produces same result) 2ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Regression prevention: Ensure existing behavior unchanged > Error messages are preserved (validation still returns clear errors) 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unknown field preservation (WOLOG) > preserves unknown fields in thinking content via .passthrough() 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unknown field preservation (WOLOG) > preserves unknown fields in transformed tool-call → tool_use 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unknown field preservation (WOLOG) > preserves CLI metadata fields via .passthrough() 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unknown field preservation (WOLOG) > END-TO-END: preserves unknown fields through normalizeRawMessage() 1ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Unknown field preservation (WOLOG) > END-TO-END: preserves unknown fields in transformed tool-call through normalizeRawMessage() 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > normalizes text events to agent text content 1ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > normalizes new direct session-role envelope shape 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > normalizes thinking text events 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > renders session protocol user text envelopes 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > renders legacy user text messages 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > normalizes service events to visible agent text 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > normalizes tool-call lifecycle events 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > maps turn-end to ready event and drops turn-start 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > normalizes file events with required size and optional image metadata 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > rejects file events without required size 1ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > marks subagent-linked messages as sidechain messages 1ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > drops start/stop lifecycle markers 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for non-cuid subagent identifiers 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for malformed session payloads 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for agent session events without turn 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for turn-end session events without status 0ms
+ ✓ sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for service events from user role 0ms
+
+ Test Files  3 passed (3)
+      Tests  79 passed (79)
+   Start at  12:13:11
+   Duration  643ms (transform 275ms, setup 0ms, collect 447ms, tests 54ms, environment 0ms, prepare 272ms)
+
+Done in 1.68s.
+Done in 1.85s.

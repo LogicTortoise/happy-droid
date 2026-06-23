@@ -5,7 +5,12 @@ import {
     formatBytes,
     formatAttachmentMarker,
     appendAttachmentMarkers,
+    collectMessageDownloads,
+    extractArtifactRefsFromText,
     PickedFile,
+    sanitizeFileName,
+    isImageMimeType,
+    normalizeArtifactRef,
 } from './attachments';
 import { MessageAttachment } from './typesMessageMeta';
 
@@ -78,5 +83,82 @@ describe('message markers', () => {
 
     it('returns the original text when there are no attachments', () => {
         expect(appendAttachmentMarkers('hello', [])).toBe('hello');
+    });
+});
+
+describe('download helpers', () => {
+    it('extracts artifact refs from attachment markers', () => {
+        const items = extractArtifactRefsFromText('done\n[attachment: report.pdf (application/pdf, 2.0 KB) artifact:art-123]');
+        expect(items).toEqual([{
+            id: 'artifact:art-123',
+            source: 'artifact',
+            artifactId: 'art-123',
+            name: 'report.pdf',
+            mimeType: 'application/pdf',
+            size: 2048,
+        }]);
+    });
+
+    it('sanitizes unsafe file names', () => {
+        expect(sanitizeFileName('../bad:name?.png')).toBe('.._bad_name_.png');
+        expect(sanitizeFileName('   ')).toBe('file');
+    });
+
+    it('detects image mime types', () => {
+        expect(isImageMimeType('image/png')).toBe(true);
+        expect(isImageMimeType('application/pdf')).toBe(false);
+    });
+
+    it('normalizes artifact refs', () => {
+        expect(normalizeArtifactRef('artifact:abc')).toBe('abc');
+        expect(normalizeArtifactRef('2d931510-d99f-494a-8c67-87feb05e1594')).toBe('2d931510-d99f-494a-8c67-87feb05e1594');
+        expect(normalizeArtifactRef('upload-1')).toBeNull();
+    });
+
+    it('collects meta attachments and dedupes matching text markers', () => {
+        const message = {
+            kind: 'user-text' as const,
+            id: 'm1',
+            localId: null,
+            createdAt: 1,
+            text: appendAttachmentMarkers('hello', [sampleAttachment]),
+            meta: { attachments: [sampleAttachment] },
+        };
+
+        const items = collectMessageDownloads(message);
+        expect(items).toHaveLength(1);
+        expect(items[0].artifactId).toBe('art-123');
+    });
+
+    it('collects session file refs separately from artifact refs', () => {
+        const message = {
+            kind: 'tool-call' as const,
+            id: 'm2',
+            localId: null,
+            createdAt: 1,
+            children: [],
+            tool: {
+                name: 'file',
+                state: 'completed' as const,
+                input: {
+                    ref: 'outputs/image.png',
+                    name: 'image.png',
+                    size: 10,
+                    mimeType: 'image/png',
+                    image: { width: 1, height: 1 },
+                },
+                createdAt: 1,
+                startedAt: 1,
+                completedAt: 1,
+                description: null,
+            },
+        };
+
+        const items = collectMessageDownloads(message);
+        expect(items).toHaveLength(1);
+        expect(items[0].source).toBe('file-ref');
+        expect(items[0].artifactId).toBeUndefined();
+        expect(items[0].ref).toBe('outputs/image.png');
+        expect(items[0].mimeType).toBe('image/png');
     });
 });

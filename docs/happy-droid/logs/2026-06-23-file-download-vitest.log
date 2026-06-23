@@ -1,0 +1,15 @@
+yarn workspace v1.22.22
+yarn run v1.22.22
+$ vitest sources/sync/attachments.spec.ts --run
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-app
+
+ ✓ sources/sync/attachments.spec.ts (15 tests) 5ms
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  11:59:07
+   Duration  473ms (transform 45ms, setup 0ms, collect 45ms, tests 5ms, environment 0ms, prepare 82ms)
+
+Done in 1.09s.
+Done in 1.27s.
