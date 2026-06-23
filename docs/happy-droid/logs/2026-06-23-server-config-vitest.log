@@ -1,0 +1,19 @@
+yarn workspace v1.22.22
+yarn run v1.22.22
+$ vitest sources/sync/serverConfig.spec.ts --run --reporter verbose
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-app
+
+ ✓ sources/sync/serverConfig.spec.ts > serverConfig > falls back to the default Happy production server 9ms
+ ✓ sources/sync/serverConfig.spec.ts > serverConfig > uses EXPO_PUBLIC_HAPPY_SERVER_URL when no runtime override exists 2ms
+ ✓ sources/sync/serverConfig.spec.ts > serverConfig > prefers MMKV runtime override over EXPO_PUBLIC_HAPPY_SERVER_URL 3ms
+ ✓ sources/sync/serverConfig.spec.ts > serverConfig > uses the configured log server with the same env/MMKV pattern 1ms
+ ✓ sources/sync/serverConfig.spec.ts > serverConfig > validates only non-empty HTTP(S) server URLs 1ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  17:10:12
+   Duration  347ms (transform 33ms, setup 0ms, collect 26ms, tests 17ms, environment 0ms, prepare 50ms)
+
+Done in 0.94s.
+Done in 1.08s.

@@ -138,3 +138,68 @@ docs/happy-droid/logs/2026-06-23-file-download-rpc-adb-install.log
 结果：Performing Streamed Install / Success
 确认：pm path com.slopus.happy.dev 返回 base.apk 路径
 ```
+
+## 2026-06-23 - P0 服务端地址可配核验
+
+### 核验范围
+
+- App 端：`packages/happy-app/sources/sync/serverConfig.ts` 的 `getServerUrl()` 链路，以及认证、REST、socket、artifact/API helper 对它的引用。
+- 运行时配置：`packages/happy-app/sources/app/(app)/server.tsx` 的 Server Configuration 保存到 MMKV `custom-server-url`。
+- 桥端只读参考：`/Users/Hht/Documents/10.github/happy-telegram/src/config.ts` 与 `src/server-client.ts`。
+
+### 结果
+
+```text
+App 配置优先级：
+MMKV custom-server-url -> EXPO_PUBLIC_HAPPY_SERVER_URL -> https://api.cluster-fluster.com
+
+Happy Telegram 桥配置优先级：
+HAPPY_TG_SERVER_URL -> ~/.happy-telegram/config.env:HAPPY_TG_SERVER_URL -> http://localhost:3005
+
+本次已验证的相同 base URL：
+http://localhost:3005
+
+对齐方式：
+桥端本机配置未发现未注释的 HAPPY_TG_SERVER_URL，因此桥端实际落到默认 http://localhost:3005。
+App 侧本次通过 EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 对齐同一 URL。
+```
+
+未改动桥端配置，也未触碰任何代理/网络/VPN/Tailscale 设置。
+
+### 单元测试
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 yarn workspace happy-app test sources/sync/serverConfig.spec.ts --run --reporter verbose
+结果：5 tests passed
+覆盖：默认 https://api.cluster-fluster.com、EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005、MMKV custom-server-url override、log server env/MMKV、validateServerUrl
+日志：docs/happy-droid/logs/2026-06-23-server-config-vitest.log
+```
+
+### 静态检查
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 yarn workspace happy-app typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-server-config-typecheck.log
+```
+
+### Android 构建验证
+
+```text
+cd packages/happy-app
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 APP_ENV=development npx expo prebuild -p android --no-install
+
+结果：Finished prebuild
+日志：docs/happy-droid/logs/2026-06-23-server-config-expo-prebuild-localhost.log
+```
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+
+结果：BUILD SUCCESSFUL in 37s
+日志：docs/happy-droid/logs/2026-06-23-server-config-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+```

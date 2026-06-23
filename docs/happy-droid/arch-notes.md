@@ -102,6 +102,8 @@
 ### 2.4 ⭐ 服务端地址可配（P0，已亲自核对 `serverConfig.ts` 全文）
 - **生效路径**：`getServerUrl()` 优先级 = MMKV `custom-server-url`（运行时可改，跨登出保留）→ `process.env.EXPO_PUBLIC_HAPPY_SERVER_URL` → 默认 `https://api.cluster-fluster.com`（`sources/sync/serverConfig.ts:10-14`）。socket 与 REST 都走它。
 - `setServerUrl()` / `validateServerUrl()`（仅 http/https）已具备 → **运行时改服务器地址的能力已存在**。
+- **与现有 Happy Telegram 桥对齐**：桥端只读核对结果为 `/Users/Hht/Documents/10.github/happy-telegram/src/config.ts` 中 `serverUrl = process.env.HAPPY_TG_SERVER_URL || fileEnv.HAPPY_TG_SERVER_URL || 'http://localhost:3005'`，`server-client.ts` 使用同一个 `config.serverUrl` 访问 `/v1/auth`、REST baseURL 与 socket.io `/v1/updates`，auth 同为 `{ token, clientType:'user-scoped' }`。因此 App 与桥共用后端的判定标准是：桥端运行时 `HAPPY_TG_SERVER_URL` 与 App 的 `EXPO_PUBLIC_HAPPY_SERVER_URL`（或应用内 Server Configuration 写入的 MMKV `custom-server-url`）必须是同一个 base URL。
+- **本次实际对齐结论**：本机桥配置未发现未注释的 `HAPPY_TG_SERVER_URL`，因此桥端实际会落到默认 `http://localhost:3005`。本轮选择 App 侧对齐桥端：构建/验证时显式设置 `EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005`，并用单测覆盖 env 与 MMKV override 优先级。若后续桥端显式切到生产 `https://api.cluster-fluster.com`，App 侧也必须同步改为同一 URL。
 - ⚠️ **不一致点（需留意）**：`sources/sync/appConfig.ts:87-89` 另读的是 `EXPO_PUBLIC_SERVER_URL`（少了 `HAPPY_`）。任务规定的变量名是 `EXPO_PUBLIC_HAPPY_SERVER_URL`（与 `serverConfig.ts` 一致）。P0「服务端可配」以 `getServerUrl()` 这条链为准；appConfig 的 `serverUrl` 用途不同，后续若发现冲突需对齐。
 
 ### 2.5 Session 模型（客户端）

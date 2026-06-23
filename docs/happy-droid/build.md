@@ -230,3 +230,59 @@ Launcher activity: com.slopus.happy.dev/.MainActivity
 ```
 
 **结论**：本地 APK 构建链路已真正完成，已产出可安装 APK，并已在连接设备上安装成功。
+
+## 4. 服务端地址配置验证（2026-06-23）
+
+### App 端权威配置链路
+
+`packages/happy-app/sources/sync/serverConfig.ts` 是 App 端当前同步/认证/文件相关请求的权威 server URL 来源：
+
+```text
+MMKV server-config:custom-server-url
+-> EXPO_PUBLIC_HAPPY_SERVER_URL
+-> https://api.cluster-fluster.com
+```
+
+已核对的消费路径：
+
+- `sources/auth/*` 的 QR/auth 请求调用 `getServerUrl()`。
+- `sources/sync/apiSocket.ts` 的 socket.io `/v1/updates` 与 REST `request()` 调用 `getServerUrl()`。
+- `sources/sync/apiArtifacts.ts`、`apiServices.ts`、`apiFriends.ts`、`apiFeed.ts`、`apiGithub.ts`、`apiKv.ts`、`apiPush.ts`、`apiUsage.ts` 等 API helper 调用 `getServerUrl()`。
+- `sources/app/(app)/server.tsx` 提供运行时 Server Configuration，保存后写入同一个 MMKV `custom-server-url`。
+
+### 与 Happy Telegram 桥对齐
+
+只读核对 `/Users/Hht/Documents/10.github/happy-telegram`：
+
+- `src/config.ts`：桥端 `serverUrl` 来源为 `HAPPY_TG_SERVER_URL`、`~/.happy-telegram/config.env` 中的 `HAPPY_TG_SERVER_URL`，否则默认 `http://localhost:3005`。
+- `src/server-client.ts`：桥端使用同一个 `config.serverUrl` 访问 `/v1/auth`、REST baseURL 和 socket.io `/v1/updates`，socket auth 为 `{ token, clientType:'user-scoped' }`。
+- 本机配置检查未发现未注释的 `HAPPY_TG_SERVER_URL`；桥端当前实际 base URL 因此是 `http://localhost:3005`。
+- 本轮选择 App 侧对齐桥端：验证与 Android 构建均显式使用 `EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005`。已验证的相同 URL 是 `http://localhost:3005`。
+
+构建时显式指定同后端：
+
+```bash
+cd packages/happy-app
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+APP_ENV=development npx expo prebuild -p android --no-install
+```
+
+如果桥端后续显式设置 `HAPPY_TG_SERVER_URL=https://api.cluster-fluster.com`，App 侧也必须同步改为同一 URL（可通过构建时 `EXPO_PUBLIC_HAPPY_SERVER_URL` 或 App 内 `Settings -> Server` 的 MMKV override）。`EXPO_PUBLIC_SERVER_URL` 不是本 P0 同步链路的权威变量，本链路以 `EXPO_PUBLIC_HAPPY_SERVER_URL` / `serverConfig.ts` 为准。
+
+### 验证命令
+
+```bash
+rg -n "EXPO_PUBLIC_HAPPY_SERVER_URL|DEFAULT_SERVER_URL|getServerUrl|custom-server-url" packages/happy-app/sources/sync/serverConfig.ts packages/happy-app/sources/auth packages/happy-app/sources/sync
+rg -n "HAPPY_TG_SERVER_URL|serverUrl|/v1/updates|/v1/auth" /Users/Hht/Documents/10.github/happy-telegram/src/config.ts /Users/Hht/Documents/10.github/happy-telegram/src/server-client.ts
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 yarn workspace happy-app test sources/sync/serverConfig.spec.ts --run --reporter verbose
+yarn workspace happy-app typecheck
+cd packages/happy-app && EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 APP_ENV=development npx expo prebuild -p android --no-install
+cd packages/happy-app/android && EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/Users/Hht/Library/Android/sdk ./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+```
+
+验证日志：
+
+- `docs/happy-droid/logs/2026-06-23-server-config-vitest.log`
+- `docs/happy-droid/logs/2026-06-23-server-config-typecheck.log`
+- `docs/happy-droid/logs/2026-06-23-server-config-expo-prebuild-localhost.log`
+- `docs/happy-droid/logs/2026-06-23-server-config-gradle-assembleDebug.log`
