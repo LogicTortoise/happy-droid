@@ -1,0 +1,36 @@
+yarn workspace v1.22.22
+yarn exec v1.22.22
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-cli
+
+Build stderr (could be debugger output): Warning (package.json#bin.happy): Ignoring file outside of dist directories
+Warning (package.json#bin["happy-mcp"]): Ignoring file outside of dist directories
+Generated an empty chunk: "index".
+Generated an empty chunk: "codex/happyMcpStdioBridge".
+Generated an empty chunk: "index".
+Generated an empty chunk: "codex/happyMcpStdioBridge".
+
+Build stdout: yarn run v1.22.22
+$ shx rm -rf dist && tsc --noEmit && pkgroll
+Done in 6.32s.
+
+Build stderr (could be debugger output): Warning (package.json#bin.happy): Ignoring file outside of dist directories
+Warning (package.json#bin["happy-mcp"]): Ignoring file outside of dist directories
+Generated an empty chunk: "index".
+Generated an empty chunk: "codex/happyMcpStdioBridge".
+Generated an empty chunk: "index".
+Generated an empty chunk: "codex/happyMcpStdioBridge".
+
+Build stdout: yarn run v1.22.22
+$ shx rm -rf dist && tsc --noEmit && pkgroll
+Done in 5.75s.
+
+ ✓ |unit| src/codex/__tests__/voiceModePrompt.test.ts (3 tests) 3ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  02:57:22
+   Duration  13.76s (transform 262ms, setup 0ms, collect 1.01s, tests 3ms, environment 0ms, prepare 47ms)
+
+Done in 14.37s.
+Done in 14.51s.

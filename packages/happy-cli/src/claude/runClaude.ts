@@ -28,6 +28,7 @@ import { claudeLocal } from '@/claude/claudeLocal';
 import { createSessionScanner } from '@/claude/utils/sessionScanner';
 import { Session } from './session';
 import { applySandboxPermissionPolicy, resolveInitialClaudePermissionMode } from './utils/permissionMode';
+import { appendVoiceModeSystemPrompt } from '@/voice/voiceModePrompt';
 
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = 'node' | 'bun'
@@ -313,6 +314,12 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             logger.debug(`[loop] Append system prompt updated from user message: ${messageAppendSystemPrompt ? 'set' : 'reset to none'}`);
         } else {
             logger.debug(`[loop] User message received with no append system prompt override, using current: ${currentAppendSystemPrompt ? 'set' : 'none'}`);
+        }
+
+        if (message.meta?.voiceMode === true) {
+            messageAppendSystemPrompt = appendVoiceModeSystemPrompt(messageAppendSystemPrompt);
+            currentAppendSystemPrompt = messageAppendSystemPrompt;
+            logger.debug('[loop] Voice mode concise response prompt enabled');
         }
 
         // Resolve allowed tools - use message.meta.allowedTools if provided, otherwise use current

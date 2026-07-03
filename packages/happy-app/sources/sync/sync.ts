@@ -42,6 +42,7 @@ import { UserProfile } from './friendTypes';
 import { resolveMessageModeMeta } from './messageMeta';
 import { MessageAttachment } from './typesMessageMeta';
 import { ATTACHMENT_MAX_BYTES, PickedFile, appendAttachmentMarkers, buildAttachmentBody } from './attachments';
+import { appendVoiceModeSystemPrompt } from '@/voice/voiceMode';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -504,6 +505,10 @@ class Sync {
         const hasAttachments = !!attachments && attachments.length > 0;
         const finalText = hasAttachments ? appendAttachmentMarkers(text, attachments!) : text;
         const finalDisplayText = displayText ?? (hasAttachments ? text : undefined);
+        const voiceModeEnabled = storage.getState().localSettings.voiceModeEnabled;
+        const appendSystemPrompt = voiceModeEnabled
+            ? appendVoiceModeSystemPrompt(systemPrompt)
+            : systemPrompt;
 
         // Create user message content with metadata
         const content: RawRecord = {
@@ -517,7 +522,8 @@ class Sync {
                 permissionMode,
                 model,
                 fallbackModel,
-                appendSystemPrompt: systemPrompt,
+                appendSystemPrompt,
+                ...(voiceModeEnabled && { voiceMode: true }),
                 ...(finalDisplayText && { displayText: finalDisplayText }), // Add displayText if provided
                 ...(hasAttachments && { attachments }) // Structured attachment refs
             }

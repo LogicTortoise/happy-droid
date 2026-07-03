@@ -28,6 +28,8 @@ export interface MobileMessageMeta {
   permissionMode?: string;
   /** Model name if applicable */
   model?: string | null;
+  /** True when the mobile user message was sent from voice mode */
+  voiceMode?: boolean;
 }
 
 /**

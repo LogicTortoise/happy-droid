@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANDROID_RECOGNIZER_RESULTS, extractSpeechRecognitionText, sanitizeTextForSpeech } from './voiceMode';
+import { ANDROID_RECOGNIZER_RESULTS, VOICE_MODE_APPEND_SYSTEM_PROMPT, appendVoiceModeSystemPrompt, extractSpeechRecognitionText, sanitizeTextForSpeech } from './voiceMode';
 
 describe('voiceMode helpers', () => {
     it('sanitizes markdown into readable TTS text', () => {
@@ -27,5 +27,13 @@ describe('voiceMode helpers', () => {
     it('returns null when recognizer extras contain no text', () => {
         expect(extractSpeechRecognitionText({ [ANDROID_RECOGNIZER_RESULTS]: [] })).toBeNull();
         expect(extractSpeechRecognitionText(null)).toBeNull();
+    });
+
+    it('appends the voice-mode concise response instruction to a base prompt', () => {
+        const prompt = appendVoiceModeSystemPrompt('Base system prompt.');
+
+        expect(prompt).toContain('Base system prompt.');
+        expect(prompt).toContain(VOICE_MODE_APPEND_SYSTEM_PROMPT);
+        expect(appendVoiceModeSystemPrompt('  ')).toBe(VOICE_MODE_APPEND_SYSTEM_PROMPT);
     });
 });

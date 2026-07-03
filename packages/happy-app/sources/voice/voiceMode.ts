@@ -2,6 +2,18 @@ export const ANDROID_RECOGNIZER_ACTION = 'android.speech.action.RECOGNIZE_SPEECH
 export const ANDROID_RECOGNIZER_RESULTS = 'android.speech.extra.RESULTS';
 
 const MAX_SPEECH_TEXT_LENGTH = 1200;
+export const VOICE_MODE_APPEND_SYSTEM_PROMPT = [
+    'Current mode: voice.',
+    'Reply in 1-3 concise, conversational sentences.',
+    'Lead with the answer and avoid code blocks, long lists, and verbose explanations unless the user explicitly asks for them.',
+].join(' ');
+
+export function appendVoiceModeSystemPrompt(basePrompt: string): string {
+    const trimmed = basePrompt.trim();
+    return trimmed
+        ? `${trimmed}\n\n${VOICE_MODE_APPEND_SYSTEM_PROMPT}`
+        : VOICE_MODE_APPEND_SYSTEM_PROMPT;
+}
 
 export function sanitizeTextForSpeech(text: string): string {
     return text

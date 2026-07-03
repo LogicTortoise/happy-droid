@@ -1,0 +1,14 @@
+yarn workspace v1.22.22
+yarn exec v1.22.22
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-wire
+
+ ✓ src/messages.test.ts (10 tests) 12ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  22:33:58
+   Duration  626ms (transform 128ms, setup 0ms, collect 238ms, tests 12ms, environment 0ms, prepare 83ms)
+
+Done in 1.57s.
+Done in 1.72s.

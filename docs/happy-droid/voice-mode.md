@@ -52,9 +52,37 @@ mic button
 
 当 `voiceModeEnabled=false` 时，mic button 保持现有 ElevenLabs realtime 行为。当 `voiceModeEnabled=true` 时，Android mic button 改为一次性系统语音输入。非 Android 平台暂不启用本地 STT。
 
-### 与生成端精简的关系
+### 生成端感知精简
 
-本轮只做客户端 TTS/STT 与开关入口。生成端感知“语音模式后更精炼”属于下一步 runner/protocol 任务：App 可在语音模式发送消息时通过 `meta.appendSystemPrompt` 注入精简提示，runner 侧需要确认透传并生效。
+语音模式开启后，App 在发送用户文本消息时同时写入两类 meta：
+
+```text
+meta.voiceMode = true
+meta.appendSystemPrompt = <happy-app base system prompt> + <voice concise prompt>
+```
+
+精简提示由客户端统一生成，内容约束为：当前是语音模式，回复控制在 1-3 句，口语化，优先直接结论，避免代码块、长列表和冗长解释，除非用户明确要求。
+
+传递与生效链路：
+
+```text
+Settings voiceModeEnabled=true
+  -> sync.sendMessage()
+  -> encrypted RawRecord meta.voiceMode + meta.appendSystemPrompt
+  -> /v3/sessions/{id}/messages
+  -> happy-cli ApiSessionClient decrypts UserMessage
+  -> runner reads message.meta.voiceMode + message.meta.appendSystemPrompt
+  -> Claude SDK --append-system-prompt or Codex turn input constrains this turn
+```
+
+`meta.voiceMode` 是协议层显式标记，供本 fork runner/后续 agent 适配器识别当前输入来自语音模式；`meta.appendSystemPrompt` 是向后兼容的实际约束通道。
+
+当前 runner 生效方式：
+
+- Claude：`runClaude.ts` 读取 `message.meta.voiceMode`，用 `appendVoiceModeSystemPrompt()` 去重合并精简提示，再通过 Claude SDK `--append-system-prompt` 生效。
+- Codex：`runCodex.ts` 的 `CodexEnhancedMode` 和 `MessageQueue2` hash 纳入 `customSystemPrompt` / `appendSystemPrompt`；收到 `message.meta.voiceMode=true` 时同样用 `appendVoiceModeSystemPrompt()` 去重合并，并在每轮 `turn/start` 输入前拼入 prompt，使 Codex 输出受到同一精简约束。
+
+线上 `happy-telegram` 不参与这条链路，也不需要改动。
 
 ## 验证计划
 

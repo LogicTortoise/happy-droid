@@ -286,3 +286,33 @@ cd packages/happy-app/android && EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3
 - `docs/happy-droid/logs/2026-06-23-server-config-typecheck.log`
 - `docs/happy-droid/logs/2026-06-23-server-config-expo-prebuild-localhost.log`
 - `docs/happy-droid/logs/2026-06-23-server-config-gradle-assembleDebug.log`
+
+## 5. 语音模式生成端感知构建验证（2026-06-23）
+
+本轮改动覆盖 App 消息 meta、共享 wire schema 与本 fork `happy-cli` Claude runner。Android 构建仍使用与桥端对齐的后端 URL：
+
+```bash
+cd packages/happy-app
+APP_ENV=development npx expo prebuild -p android --no-install
+```
+
+```text
+结果：Finished prebuild
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-expo-prebuild.log
+```
+
+```bash
+cd packages/happy-app/android
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+```
+
+```text
+结果：BUILD SUCCESSFUL in 36s
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+大小：452M
+SHA-256：1151f9e209f4b1c727b73733dcbf8d151b2b93ff29d5ee0b9983dfc5ba75f01e
+```

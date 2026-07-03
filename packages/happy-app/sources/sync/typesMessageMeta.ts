@@ -23,6 +23,7 @@ export const MessageMetaSchema = z.object({
     allowedTools: z.array(z.string()).nullable().optional(), // Allowed tools for this message (null = reset)
     disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
     displayText: z.string().optional(), // Optional text to display in UI instead of actual message text
+    voiceMode: z.boolean().optional(), // Message was sent while Android voice mode was enabled
     attachments: z.array(MessageAttachmentSchema).optional() // File attachments referenced by this message
 });
 

@@ -1,0 +1,18 @@
+yarn workspace v1.22.22
+yarn run v1.22.22
+$ vitest sources/voice/voiceMode.spec.ts --run --reporter verbose
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-app
+
+ ✓ sources/voice/voiceMode.spec.ts > voiceMode helpers > sanitizes markdown into readable TTS text 1ms
+ ✓ sources/voice/voiceMode.spec.ts > voiceMode helpers > extracts Android recognizer results from standard extra key 0ms
+ ✓ sources/voice/voiceMode.spec.ts > voiceMode helpers > returns null when recognizer extras contain no text 0ms
+ ✓ sources/voice/voiceMode.spec.ts > voiceMode helpers > appends the voice-mode concise response instruction to a base prompt 0ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  22:33:58
+   Duration  498ms (transform 36ms, setup 0ms, collect 33ms, tests 2ms, environment 0ms, prepare 88ms)
+
+Done in 1.69s.
+Done in 1.83s.

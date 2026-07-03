@@ -401,3 +401,156 @@ adb devices
 4. 发送消息并等待 agent 文本回复，确认系统 TTS 朗读新回复。
 5. 关闭 Voice Mode，确认 mic 按钮恢复原 ElevenLabs realtime voice assistant 行为。
 ```
+
+## 2026-06-23 - P1 语音模式生成端感知精简
+
+### 范围
+
+- 任务：语音模式下在消息 meta 打 voice 标记/注入简短 system 提示，由本 fork runner/协议层识别并约束输出。
+- 改动范围：`packages/happy-app` 发送 meta、`packages/happy-wire` message meta schema、`packages/happy-cli` Claude runner、`docs/happy-droid/voice-mode.md`。
+- 未修改线上 `happy-telegram`、上游 `happy`、代理/网络/VPN/Tailscale 配置。
+
+### 实现结论
+
+当 App 本地 `voiceModeEnabled=true` 时，`sync.sendMessage()` 会在用户消息 meta 中写入：
+
+```text
+voiceMode: true
+appendSystemPrompt: <base happy-app system prompt> + <voice concise prompt>
+```
+
+本 fork `happy-cli` Claude runner 识别 `message.meta.voiceMode === true`，并兜底把同一条精简提示合并到 `appendSystemPrompt`；如果客户端已注入同一提示，则 runner helper 会去重。实际约束通过 Claude SDK `--append-system-prompt` 生效。
+
+### 单元/协议测试
+
+```text
+yarn workspace happy-app test sources/voice/voiceMode.spec.ts --run --reporter verbose
+结果：4 tests passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-app-vitest.log
+```
+
+```text
+yarn workspace @slopus/happy-wire exec vitest run src/messages.test.ts --reporter verbose
+结果：10 tests passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-wire-vitest.log
+```
+
+```text
+yarn workspace happy exec vitest run src/voice/voiceModePrompt.test.ts --reporter verbose
+结果：3 tests passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-cli-vitest.log
+```
+
+覆盖点：
+
+- App voice prompt helper 会把精简提示追加到 base prompt。
+- wire `UserMessageSchema` 接受 `meta.voiceMode=true` 与 `appendSystemPrompt`。
+- CLI runner helper 会追加语音模式精简提示，并避免重复追加。
+
+### 静态检查
+
+```text
+yarn workspace happy-app typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-app-typecheck.log
+```
+
+```text
+yarn workspace @slopus/happy-wire typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-wire-typecheck.log
+```
+
+```text
+yarn workspace happy typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-cli-typecheck.log
+```
+
+### Android 构建验证
+
+```text
+APP_ENV=development npx expo prebuild -p android --no-install
+结果：Finished prebuild
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-expo-prebuild.log
+```
+
+```text
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+
+结果：BUILD SUCCESSFUL in 36s
+日志：docs/happy-droid/logs/2026-06-23-voice-mode-meta-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+大小：452M
+SHA-256：1151f9e209f4b1c727b73733dcbf8d151b2b93ff29d5ee0b9983dfc5ba75f01e
+```
+
+### 设备端验证状态
+
+```text
+adb devices
+结果：List of devices attached 为空
+```
+
+当前没有在线 Android 设备/模拟器，因此未能在真机上发送一条语音模式消息并观察模型回复风格。已完成可自动化验证：App meta helper、wire schema、CLI runner helper、三个 workspace typecheck、Android prebuild、Gradle debug APK 构建。
+
+## 2026-06-24 - P1 语音模式生成端感知 Codex 修复
+
+### 范围
+
+- 任务：修复 Codex runner 未识别 `voiceMode` / `appendSystemPrompt`，导致 App 创建 Codex 会话时语音模式精简约束不生效。
+- 改动范围：`packages/happy-cli/src/codex/runCodex.ts`、Codex runner 单测、`docs/happy-droid/voice-mode.md`。
+- 未修改线上 `happy-telegram`、上游 `happy`、代理/网络/VPN/Tailscale 配置。
+
+### 实现结论
+
+Codex runner 现在：
+
+- `CodexEnhancedMode` 纳入 `customSystemPrompt` / `appendSystemPrompt`。
+- `MessageQueue2` hash 纳入 prompt 字段，避免默认消息与语音提示消息被错误合批。
+- `onUserMessage` 读取 `message.meta.appendSystemPrompt` / `customSystemPrompt`。
+- `message.meta.voiceMode===true` 时调用与 Claude 相同的 `appendVoiceModeSystemPrompt()`，重复提示不会二次追加。
+- `buildCodexTurnPrompt()` 在每轮 Codex `turn/start` 输入前拼入 prompt，确保 Codex 输出被同一语音精简提示约束。
+
+### 单元测试
+
+```text
+yarn workspace happy exec vitest run src/codex/__tests__/voiceModePrompt.test.ts --reporter verbose
+结果：3 tests passed
+日志：docs/happy-droid/logs/2026-06-24-codex-voice-mode-vitest.log
+```
+
+覆盖点：
+
+- `voiceMode=true` 时 `appendSystemPrompt` 和 Codex turn input 都包含精简提示。
+- 已包含精简提示时不重复追加。
+- prompt-bearing mode 与 default mode 的 hash 不同。
+
+### 静态检查
+
+```text
+yarn workspace happy typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-06-24-codex-voice-mode-typecheck.log
+```
+
+### 设备端验证状态
+
+本轮修复的是 happy-cli Codex runner 的生成端约束路径，未改 App native 代码；当前仍无在线 Android 设备/模拟器可做真实 Codex 会话风格验收。已完成可自动化验证：Codex runner 单测与 happy-cli typecheck。
+
+### 2026-07-03 复验
+
+```text
+yarn workspace happy exec vitest run src/codex/__tests__/voiceModePrompt.test.ts src/voice/voiceModePrompt.test.ts --reporter verbose
+结果：2 test files passed, 6 tests passed
+日志：docs/happy-droid/logs/2026-07-03-voice-mode-runner-vitest.log
+```
+
+```text
+yarn workspace happy typecheck
+结果：tsc --noEmit passed
+日志：docs/happy-droid/logs/2026-07-03-voice-mode-runner-typecheck.log
+```

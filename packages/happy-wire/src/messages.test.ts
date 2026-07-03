@@ -136,6 +136,23 @@ describe('shared wire message schemas', () => {
     expect(parsed.success).toBe(true);
   });
 
+  it('parses voice-mode metadata on legacy decrypted user messages', () => {
+    const parsed = UserMessageSchema.safeParse({
+      role: 'user',
+      content: {
+        type: 'text',
+        text: 'summarize this out loud',
+      },
+      meta: {
+        sentFrom: 'android',
+        voiceMode: true,
+        appendSystemPrompt: 'Reply briefly for voice playback.',
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
   it('parses legacy decrypted agent message payload', () => {
     const parsed = AgentMessageSchema.safeParse({
       role: 'agent',

@@ -6,6 +6,7 @@
 ## [Unreleased]
 
 ### Added
+- **语音模式生成端感知精简（P1）**：App 在语音模式发送消息时写入 `meta.voiceMode` 并追加精简 system prompt；共享协议 schema 与本 fork Claude/Codex runner 识别该标记，约束回复更适合 TTS 朗读。
 - **语音模式客户端（P1）**：App 新增 Android Voice Mode 本地开关，使用系统 STT 进行语音输入，并通过系统 TTS 朗读新到达的 agent 文本回复；保留未启用时原 ElevenLabs realtime 语音行为。
 - **自建/列出/切换 Session UI 与同步逻辑（P1）**：确认 App 不依赖 Bot，通过 `happy-cli daemon` machine RPC 自建 session，使用 `/v1/sessions` 与 `/v3/sessions/{id}/messages` 完成列表、切换与消息同步，并补充新建后等待本地 session 可用的同步加固和 RPC contract 测试。
 - **自建 Session runner 设计（P1）**：明确 App 新建 session 由本 fork `happy-cli daemon` 作为 machine runner 执行 Claude/agent，对比自建轻量 runner 与线上桥复用方案，并记录责任边界与落地路径。

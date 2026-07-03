@@ -31,6 +31,7 @@ import type { ApiSessionClient } from '@/api/apiSession';
 import { resolveCodexExecutionPolicy } from './executionPolicy';
 import { mapCodexMcpMessageToSessionEnvelopes, mapCodexProcessorMessageToSessionEnvelopes } from './utils/sessionProtocolMapper';
 import { resumeExistingThread } from './resumeExistingThread';
+import { appendVoiceModeSystemPrompt } from '@/voice/voiceModePrompt';
 
 type ReadyEventOptions = {
     pending: unknown;
@@ -60,6 +61,102 @@ export function emitReadyIfIdle({ pending, queueSize, shouldExit, sendReady, not
     return true;
 }
 
+type PermissionMode = import('@/api/types').PermissionMode;
+
+export interface CodexEnhancedMode {
+    permissionMode: PermissionMode;
+    model?: string;
+    customSystemPrompt?: string;
+    appendSystemPrompt?: string;
+}
+
+type CodexModeState = {
+    permissionMode?: PermissionMode;
+    model?: string;
+    customSystemPrompt?: string;
+    appendSystemPrompt?: string;
+};
+
+type CodexUserMessageLike = {
+    content: { text: string };
+    meta?: {
+        permissionMode?: string;
+        model?: string | null;
+        customSystemPrompt?: string | null;
+        appendSystemPrompt?: string | null;
+        voiceMode?: boolean;
+    };
+};
+
+export function hashCodexEnhancedMode(mode: CodexEnhancedMode): string {
+    return hashObject({
+        permissionMode: mode.permissionMode,
+        model: mode.model,
+        customSystemPrompt: mode.customSystemPrompt,
+        appendSystemPrompt: mode.appendSystemPrompt,
+    });
+}
+
+export function resolveCodexMessageMode(
+    message: CodexUserMessageLike,
+    current: CodexModeState,
+): { mode: CodexEnhancedMode; next: CodexModeState } {
+    let messagePermissionMode = current.permissionMode;
+    if (message.meta?.permissionMode) {
+        messagePermissionMode = message.meta.permissionMode as PermissionMode;
+    }
+
+    let messageModel = current.model;
+    if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'model')) {
+        messageModel = message.meta.model || undefined;
+    }
+
+    let messageCustomSystemPrompt = current.customSystemPrompt;
+    if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'customSystemPrompt')) {
+        messageCustomSystemPrompt = message.meta.customSystemPrompt || undefined;
+    }
+
+    let messageAppendSystemPrompt = current.appendSystemPrompt;
+    if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'appendSystemPrompt')) {
+        messageAppendSystemPrompt = message.meta.appendSystemPrompt || undefined;
+    }
+
+    if (message.meta?.voiceMode === true) {
+        messageAppendSystemPrompt = appendVoiceModeSystemPrompt(messageAppendSystemPrompt);
+    }
+
+    const next: CodexModeState = {
+        permissionMode: messagePermissionMode,
+        model: messageModel,
+        customSystemPrompt: messageCustomSystemPrompt,
+        appendSystemPrompt: messageAppendSystemPrompt,
+    };
+
+    return {
+        mode: {
+            permissionMode: messagePermissionMode || 'default',
+            model: messageModel,
+            customSystemPrompt: messageCustomSystemPrompt,
+            appendSystemPrompt: messageAppendSystemPrompt,
+        },
+        next,
+    };
+}
+
+export function buildCodexTurnPrompt(message: string, mode: CodexEnhancedMode, first: boolean): string {
+    const promptParts = [
+        mode.customSystemPrompt,
+        mode.appendSystemPrompt,
+        message,
+    ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+    if (first) {
+        promptParts.push(CHANGE_TITLE_INSTRUCTION);
+    }
+
+    return promptParts.join('\n\n');
+}
+
 /**
  * Main entry point for the codex command with ink UI
  */
@@ -82,13 +179,6 @@ export async function runCodex(opts: {
         console.error('Alternatively, use Claude Code:');
         console.error('  \x1b[36mhappy claude\x1b[0m\n');
         process.exit(1);
-    }
-
-    // Use shared PermissionMode type for cross-agent compatibility
-    type PermissionMode = import('@/api/types').PermissionMode;
-    interface EnhancedMode {
-        permissionMode: PermissionMode;
-        model?: string;
     }
 
     //
@@ -173,42 +263,51 @@ export async function runCodex(opts: {
         }
     }
 
-    const messageQueue = new MessageQueue2<EnhancedMode>((mode) => hashObject({
-        permissionMode: mode.permissionMode,
-        model: mode.model,
-    }));
+    const messageQueue = new MessageQueue2<CodexEnhancedMode>(hashCodexEnhancedMode);
 
     // Track current overrides to apply per message
     // Use shared PermissionMode type from api/types for cross-agent compatibility
     let currentPermissionMode: import('@/api/types').PermissionMode | undefined = undefined;
     let currentModel: string | undefined = undefined;
+    let currentCustomSystemPrompt: string | undefined = undefined;
+    let currentAppendSystemPrompt: string | undefined = undefined;
 
     session.onUserMessage((message) => {
-        // Resolve permission mode (accept all modes, will be mapped in switch statement)
-        let messagePermissionMode = currentPermissionMode;
+        const resolved = resolveCodexMessageMode(message, {
+            permissionMode: currentPermissionMode,
+            model: currentModel,
+            customSystemPrompt: currentCustomSystemPrompt,
+            appendSystemPrompt: currentAppendSystemPrompt,
+        });
+
+        currentPermissionMode = resolved.next.permissionMode;
+        currentModel = resolved.next.model;
+        currentCustomSystemPrompt = resolved.next.customSystemPrompt;
+        currentAppendSystemPrompt = resolved.next.appendSystemPrompt;
+
         if (message.meta?.permissionMode) {
-            messagePermissionMode = message.meta.permissionMode as import('@/api/types').PermissionMode;
-            currentPermissionMode = messagePermissionMode;
             logger.debug(`[Codex] Permission mode updated from user message to: ${currentPermissionMode}`);
         } else {
             logger.debug(`[Codex] User message received with no permission mode override, using current: ${currentPermissionMode ?? 'default (effective)'}`);
         }
 
-        // Resolve model; explicit null resets to default (undefined)
-        let messageModel = currentModel;
-        if (message.meta?.hasOwnProperty('model')) {
-            messageModel = message.meta.model || undefined;
-            currentModel = messageModel;
-            logger.debug(`[Codex] Model updated from user message: ${messageModel || 'reset to default'}`);
+        if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'model')) {
+            logger.debug(`[Codex] Model updated from user message: ${currentModel || 'reset to default'}`);
         } else {
             logger.debug(`[Codex] User message received with no model override, using current: ${currentModel || 'default'}`);
         }
 
-        const enhancedMode: EnhancedMode = {
-            permissionMode: messagePermissionMode || 'default',
-            model: messageModel,
-        };
-        messageQueue.push(message.content.text, enhancedMode);
+        if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'customSystemPrompt')) {
+            logger.debug(`[Codex] Custom system prompt updated from user message: ${currentCustomSystemPrompt ? 'set' : 'reset to none'}`);
+        }
+        if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'appendSystemPrompt')) {
+            logger.debug(`[Codex] Append system prompt updated from user message: ${currentAppendSystemPrompt ? 'set' : 'reset to none'}`);
+        }
+        if (message.meta?.voiceMode === true) {
+            logger.debug('[Codex] Voice mode concise response prompt enabled');
+        }
+
+        messageQueue.push(message.content.text, resolved.mode);
     });
     let thinking = false;
     let currentTurnId: string | null = null;
@@ -576,11 +675,11 @@ export async function runCodex(opts: {
             first = false;
         }
 
-        let pending: { message: string; mode: EnhancedMode; isolate: boolean; hash: string } | null = null;
+        let pending: { message: string; mode: CodexEnhancedMode; isolate: boolean; hash: string } | null = null;
 
         while (!shouldExit) {
             logActiveHandles('loop-top');
-            let message: { message: string; mode: EnhancedMode; isolate: boolean; hash: string } | null = pending;
+            let message: { message: string; mode: CodexEnhancedMode; isolate: boolean; hash: string } | null = pending;
             pending = null;
             if (!message) {
                 // Capture the current signal to distinguish idle-abort from queue close
@@ -630,9 +729,7 @@ export async function runCodex(opts: {
                     }));
                 }
 
-                const turnPrompt = first
-                    ? message.message + '\n\n' + CHANGE_TITLE_INSTRUCTION
-                    : message.message;
+                const turnPrompt = buildCodexTurnPrompt(message.message, message.mode, first);
 
                 const result = await client.sendTurnAndWait(turnPrompt, {
                     model: message.mode.model,
