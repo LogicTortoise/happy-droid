@@ -59,3 +59,29 @@ Validation results:
   - Focused attachment tests: pass, 3 files / 54 tests.
 - PASS: `node scripts/happy-droid-validate.cjs --run --group app`
   - Full app Vitest suite passed, 54 files / 683 tests.
+
+## 2026-07-04 - P0 Server URL Chain Validation
+
+Implementation:
+
+- Added direct unit coverage for `packages/happy-app/sources/sync/serverConfig.ts`.
+- Covered backend URL resolution order: persisted custom URL, `globalThis.__HAPPY_CONFIG__.serverUrl`, `EXPO_PUBLIC_HAPPY_SERVER_URL`, then default cloud URL.
+- Covered trimming and clearing persisted server/log server URLs.
+- Covered `getServerInfo()` hostname/port/custom status and `validateServerUrl()` HTTP/HTTPS validation.
+- Runtime `serverConfig.ts` behavior did not require code changes.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/serverConfig.test.ts`
+  - 1 file / 10 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - 55 files / 693 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass, lockfile up to date.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 54 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
