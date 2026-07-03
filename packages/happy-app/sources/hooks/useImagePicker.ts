@@ -1,8 +1,9 @@
 /**
- * Image picker hook for attaching images to messages.
+ * Attachment picker hook for attaching images and generic files to messages.
  *
- * Wraps expo-image-picker with permission handling and thumbhash generation.
- * Enforces limits: max 20 images per message, 10MB per file.
+ * Wraps expo-image-picker for image metadata/thumbhash preservation and
+ * expo-document-picker for arbitrary file/document uploads.
+ * Enforces limits: max 20 attachments per message, 10MB per file.
  *
  * Note: fileSize from expo-image-picker is optional — some platforms do not
  * provide it (returns undefined → size=0). Such files pass the client-side
@@ -11,6 +12,7 @@
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 import { Modal } from '@/modal';
@@ -27,6 +29,7 @@ export type { AttachmentPreview };
 type UseImagePickerResult = {
     selectedImages: AttachmentPreview[];
     pickImages: () => Promise<void>;
+    pickFiles: () => Promise<void>;
     removeImage: (id: string) => void;
     clearImages: () => void;
     addImages: (images: AttachmentPreview[]) => void;
@@ -71,6 +74,18 @@ export async function normalizePickedAssetForUpload(asset: ImagePicker.ImagePick
     };
 }
 
+export function normalizePickedDocumentForUpload(asset: DocumentPicker.DocumentPickerAsset): AttachmentPreview {
+    return {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        uri: asset.uri,
+        width: 0,
+        height: 0,
+        mimeType: asset.mimeType ?? 'application/octet-stream',
+        size: asset.size ?? 0,
+        name: asset.name?.trim() || `file_${Date.now()}`,
+    };
+}
+
 export function useImagePicker(): UseImagePickerResult {
     const [selectedImages, setSelectedImages] = useState<AttachmentPreview[]>([]);
     // Ref tracks current count to avoid stale closures on rapid taps.
@@ -85,8 +100,8 @@ export function useImagePicker(): UseImagePickerResult {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Modal.alert(
-                t('imageUpload.permissionTitle'),
-                t('imageUpload.permissionMessage'),
+                t('attachments.permissionTitle'),
+                t('attachments.permissionMessage'),
                 [{ text: t('common.ok') }],
             );
             return false;
@@ -101,8 +116,8 @@ export function useImagePicker(): UseImagePickerResult {
         const remaining = MAX_IMAGES_PER_MESSAGE - selectedCountRef.current;
         if (remaining <= 0) {
             Modal.alert(
-                t('imageUpload.limitTitle'),
-                t('imageUpload.limitMessage', { max: MAX_IMAGES_PER_MESSAGE }),
+                t('attachments.limitTitle'),
+                t('attachments.limitMessage', { max: MAX_IMAGES_PER_MESSAGE }),
                 [{ text: t('common.ok') }],
             );
             return;
@@ -127,8 +142,8 @@ export function useImagePicker(): UseImagePickerResult {
 
             if (size > MAX_FILE_SIZE) {
                 Modal.alert(
-                    t('imageUpload.fileTooLargeTitle'),
-                    t('imageUpload.fileTooLargeMessage', { name: asset.fileName ?? 'image', maxMb: 10 }),
+                    t('attachments.fileTooLargeTitle'),
+                    t('attachments.fileTooLargeMessage', { name: asset.fileName ?? 'file', maxMb: 10 }),
                     [{ text: t('common.ok') }],
                 );
                 continue;
@@ -158,6 +173,43 @@ export function useImagePicker(): UseImagePickerResult {
         }
     }, [requestPermission]);
 
+    const pickFiles = useCallback(async () => {
+        const remaining = MAX_IMAGES_PER_MESSAGE - selectedCountRef.current;
+        if (remaining <= 0) {
+            Modal.alert(
+                t('attachments.limitTitle'),
+                t('attachments.limitMessage', { max: MAX_IMAGES_PER_MESSAGE }),
+                [{ text: t('common.ok') }],
+            );
+            return;
+        }
+
+        const result = await DocumentPicker.getDocumentAsync({
+            multiple: true,
+            copyToCacheDirectory: true,
+        });
+
+        if (result.canceled || !result.assets.length) return;
+
+        const previews: AttachmentPreview[] = [];
+        for (const asset of result.assets.slice(0, remaining)) {
+            const preview = normalizePickedDocumentForUpload(asset);
+            if (preview.size > MAX_FILE_SIZE) {
+                Modal.alert(
+                    t('attachments.fileTooLargeTitle'),
+                    t('attachments.fileTooLargeMessage', { name: preview.name, maxMb: 10 }),
+                    [{ text: t('common.ok') }],
+                );
+                continue;
+            }
+            previews.push(preview);
+        }
+
+        if (previews.length > 0) {
+            setSelectedImages(prev => [...prev, ...previews].slice(0, MAX_IMAGES_PER_MESSAGE));
+        }
+    }, []);
+
     const removeImage = useCallback((id: string) => {
         setSelectedImages(prev => prev.filter(img => img.id !== id));
     }, []);
@@ -174,5 +226,5 @@ export function useImagePicker(): UseImagePickerResult {
         });
     }, []);
 
-    return { selectedImages, pickImages, removeImage, clearImages, addImages };
+    return { selectedImages, pickImages, pickFiles, removeImage, clearImages, addImages };
 }

@@ -235,8 +235,8 @@ export const pl: TranslationStructure = {
         disableAnalytics: 'Wyłącz analitykę',
         analyticsDisabled: 'Wszystkie śledzenie i telemetria wyłączone',
         analyticsEnabled: 'Anonimowa analityka użytkowania aktywna',
-        imageUpload: 'Przesyłanie obrazów',
-        imageUploadSubtitle: 'Dołączaj obrazy do wiadomości, aby obsługiwani agenci mogli je analizować',
+        attachments: 'Załączniki plików',
+        attachmentsSubtitle: 'Dołączaj obrazy, pliki i dokumenty, aby obsługiwani agenci mogli je analizować',
     },
 
     errors: {
@@ -1006,19 +1006,19 @@ export const pl: TranslationStructure = {
         noData: 'Brak danych o użyciu',
     },
 
-    imageUpload: {
-        permissionTitle: 'Dostęp do biblioteki zdjęć',
-        permissionMessage: 'Zezwól na dostęp do biblioteki zdjęć, aby załączać obrazy do wiadomości.',
-        limitTitle: 'Osiągnięto limit obrazów',
-        limitMessage: ({ max }: { max: number }) => `Możesz dołączyć maksymalnie ${max} obrazów na wiadomość.`,
+    attachments: {
+        permissionTitle: 'Dostęp do załączników',
+        permissionMessage: 'Zezwól na dostęp, aby załączać pliki do wiadomości.',
+        limitTitle: 'Osiągnięto limit załączników',
+        limitMessage: ({ max }: { max: number }) => `Możesz dołączyć maksymalnie ${max} plików na wiadomość.`,
         fileTooLargeTitle: 'Plik zbyt duży',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}" przekracza limit ${maxMb}MB i nie został dodany.`,
         uploadFailedTitle: 'Przesyłanie nieudane',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? 'Nie udało się przesłać jednego zdjęcia i nie zostało wysłane.'
-            : `Nie udało się przesłać ${count} zdjęć i nie zostały wysłane.`,
-        notSupportedTitle: 'Obrazy nieobsługiwane',
-        notSupportedMessage: 'Ten agent nie obsługuje załączników obrazów. Obrazy nie zostały wysłane.',
+            ? 'Nie udało się przesłać jednego załącznika i nie został wysłany.'
+            : `Nie udało się przesłać ${count} załączników i nie zostały wysłane.`,
+        notSupportedTitle: 'Załączniki nieobsługiwane',
+        notSupportedMessage: 'Ten agent nie obsługuje załączników plików. Załączniki nie zostały wysłane.',
     },
 
     feed: {

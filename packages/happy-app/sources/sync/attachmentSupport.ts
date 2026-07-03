@@ -1,23 +1,23 @@
 export type ImageAttachmentFlavor = string | null | undefined;
 
-export type ImageAttachmentSendPlan = {
+export type AttachmentSendPlan = {
     supportsAttachments: boolean;
     shouldUseAttachments: boolean;
     shouldShowUnsupportedAlert: boolean;
     shouldSendText: boolean;
 };
 
-export function supportsImageAttachmentsForFlavor(flavor: ImageAttachmentFlavor): boolean {
+export function supportsAttachmentsForFlavor(flavor: ImageAttachmentFlavor): boolean {
     return !flavor || flavor === 'claude' || flavor === 'codex';
 }
 
-export function getImageAttachmentSendPlan(opts: {
+export function getAttachmentSendPlan(opts: {
     flavor: ImageAttachmentFlavor;
     text: string;
     attachmentCount: number;
-}): ImageAttachmentSendPlan {
+}): AttachmentSendPlan {
     const hasAttachments = opts.attachmentCount > 0;
-    const supportsAttachments = supportsImageAttachmentsForFlavor(opts.flavor);
+    const supportsAttachments = supportsAttachmentsForFlavor(opts.flavor);
     const shouldShowUnsupportedAlert = hasAttachments && !supportsAttachments;
 
     return {
@@ -27,3 +27,6 @@ export function getImageAttachmentSendPlan(opts: {
         shouldSendText: !shouldShowUnsupportedAlert || opts.text.trim().length > 0,
     };
 }
+
+export const supportsImageAttachmentsForFlavor = supportsAttachmentsForFlavor;
+export const getImageAttachmentSendPlan = getAttachmentSendPlan;

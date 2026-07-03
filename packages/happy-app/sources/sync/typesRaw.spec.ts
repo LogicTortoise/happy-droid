@@ -1756,6 +1756,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                             t: 'file',
                             ref: 'upload-file-1',
                             name: 'report.pdf',
+                            mimeType: 'application/pdf',
                             size: 1234
                         }
                     }
@@ -1770,6 +1771,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                     input: {
                         ref: 'upload-file-1',
                         name: 'report.pdf',
+                        mimeType: 'application/pdf',
                         size: 1234
                     },
                     description: 'Attached file: report.pdf'
@@ -1801,6 +1803,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                             t: 'file',
                             ref: 'upload-file-2',
                             name: 'photo.png',
+                            mimeType: 'image/png',
                             size: 4567,
                             image: {
                                 width: 800,
@@ -1820,6 +1823,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                     input: {
                         ref: 'upload-file-2',
                         name: 'photo.png',
+                        mimeType: 'image/png',
                         size: 4567,
                         image: {
                             width: 800,

@@ -7,7 +7,7 @@ interface QueueItem<T> {
     mode: T;
     modeHash: string;
     isolate?: boolean; // If true, this message must be processed alone
-    /** Decoded image attachments owned by *this* message (per-message ownership). */
+    /** Decoded attachments owned by *this* message (per-message ownership). */
     attachments?: PendingAttachment[];
 }
 

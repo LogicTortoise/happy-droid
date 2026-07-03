@@ -1,5 +1,5 @@
 /**
- * Shared types for image attachment upload pipeline.
+ * Shared types for attachment upload pipeline.
  * Defined here (not in hooks/) to avoid circular dependencies:
  * hooks/ imports from sync/, so sync/ cannot import from hooks/.
  */
@@ -8,6 +8,7 @@ export type AttachmentPreview = {
     /** Stable unique identifier for use as React key and for removal. */
     id: string;
     uri: string;
+    /** Image attachments carry dimensions; generic files use 0/0. */
     width: number;
     height: number;
     mimeType: string;
@@ -21,8 +22,17 @@ export type AttachmentPreview = {
 export type UploadedAttachment = {
     ref: string;
     name: string;
+    mimeType: string;
     size: number;
     width: number;
     height: number;
     thumbhash?: string;
 };
+
+export function isImageAttachment(attachment: { mimeType?: string | null; width?: number; height?: number }): boolean {
+    return Boolean(attachment.mimeType?.startsWith('image/'));
+}
+
+export function hasImageMetadata(attachment: { width?: number; height?: number }): attachment is { width: number; height: number } {
+    return (attachment.width ?? 0) > 0 && (attachment.height ?? 0) > 0;
+}

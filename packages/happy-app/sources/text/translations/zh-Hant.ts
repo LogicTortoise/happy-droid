@@ -218,8 +218,8 @@ export const zhHant: TranslationStructure = {
         disableAnalytics: '停用分析',
         analyticsDisabled: '所有追蹤和遙測已停用',
         analyticsEnabled: '匿名使用分析已啟用',
-        imageUpload: '圖片上傳',
-        imageUploadSubtitle: '將圖片附加到訊息中，讓支援的代理分析',
+        attachments: '檔案附件',
+        attachmentsSubtitle: '將圖片、檔案和文件附加到訊息中，讓支援的代理分析',
     },
 
     errors: {
@@ -976,19 +976,19 @@ export const zhHant: TranslationStructure = {
         noData: '暫無使用資料',
     },
 
-    imageUpload: {
-        permissionTitle: '存取照片圖庫',
-        permissionMessage: '允許存取您的照片圖庫以在訊息中附加圖片。',
-        limitTitle: '已達到圖片限制',
-        limitMessage: ({ max }: { max: number }) => `每則訊息最多可附加 ${max} 張圖片。`,
+    attachments: {
+        permissionTitle: '存取附件',
+        permissionMessage: '允許存取檔案以在訊息中新增附件。',
+        limitTitle: '已達到附件限制',
+        limitMessage: ({ max }: { max: number }) => `每則訊息最多可附加 ${max} 個檔案。`,
         fileTooLargeTitle: '檔案太大',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}"超過了 ${maxMb}MB 的限制，未能新增。`,
         uploadFailedTitle: '上傳失敗',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? '一張圖片上傳失敗，未傳送。'
-            : `${count} 張圖片上傳失敗，未傳送。`,
-        notSupportedTitle: '不支援圖片',
-        notSupportedMessage: '此代理不支援圖片附件。圖片未傳送。',
+            ? '一個附件上傳失敗，未傳送。'
+            : `${count} 個附件上傳失敗，未傳送。`,
+        notSupportedTitle: '不支援附件',
+        notSupportedMessage: '此代理不支援檔案附件。附件未傳送。',
     },
 
     feed: {

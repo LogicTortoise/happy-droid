@@ -1,36 +1,36 @@
 /**
- * Extract image files from a ClipboardEvent or DragEvent on web.
+ * Extract files from a ClipboardEvent or DragEvent on web.
  * Returns File objects that can be read and added as AttachmentPreview items.
  */
 
-export function getImagesFromClipboard(event: ClipboardEvent): File[] {
+export function getFilesFromClipboard(event: ClipboardEvent): File[] {
     const items = event.clipboardData?.items;
     if (!items) return [];
 
-    const images: File[] = [];
+    const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        if (item.kind === 'file' && item.type.startsWith('image/')) {
+        if (item.kind === 'file') {
             const file = item.getAsFile();
-            if (file) images.push(file);
+            if (file) files.push(file);
         }
     }
-    return images;
+    return files;
 }
 
-export function getImagesFromDrop(event: DragEvent): File[] {
+export function getFilesFromDrop(event: DragEvent): File[] {
     const files = event.dataTransfer?.files;
     if (!files) return [];
 
-    const images: File[] = [];
+    const picked: File[] = [];
     for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
-            images.push(file);
-        }
+        picked.push(files[i]);
     }
-    return images;
+    return picked;
 }
+
+export const getImagesFromClipboard = getFilesFromClipboard;
+export const getImagesFromDrop = getFilesFromDrop;
 
 export async function fileToAttachmentPreview(
     file: File,
@@ -47,20 +47,29 @@ export async function fileToAttachmentPreview(
     try {
         const uri = URL.createObjectURL(file);
 
-        // Get dimensions by loading as an Image element
-        const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-            const img = new Image();
-            const timeout = setTimeout(() => reject(new Error('timeout')), 5000);
-            img.onload = () => {
-                clearTimeout(timeout);
-                resolve({ width: img.naturalWidth, height: img.naturalHeight });
-            };
-            img.onerror = () => {
-                clearTimeout(timeout);
-                reject(new Error('load error'));
-            };
-            img.src = uri;
-        });
+        let width = 0;
+        let height = 0;
+        if (file.type.startsWith('image/')) {
+            try {
+                // Get dimensions by loading as an Image element.
+                ({ width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+                    const img = new Image();
+                    const timeout = setTimeout(() => reject(new Error('timeout')), 5000);
+                    img.onload = () => {
+                        clearTimeout(timeout);
+                        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                    };
+                    img.onerror = () => {
+                        clearTimeout(timeout);
+                        reject(new Error('load error'));
+                    };
+                    img.src = uri;
+                }));
+            } catch {
+                width = 0;
+                height = 0;
+            }
+        }
 
         const thumbhash = (width > 0 && height > 0)
             ? await generateThumbhash(uri, width, height)
@@ -71,8 +80,8 @@ export async function fileToAttachmentPreview(
             width,
             height,
             size: file.size,
-            name: file.name || `paste_${Date.now()}.png`,
-            mimeType: file.type || 'image/png',
+            name: file.name || `paste_${Date.now()}`,
+            mimeType: file.type || 'application/octet-stream',
             thumbhash,
         };
     } catch {

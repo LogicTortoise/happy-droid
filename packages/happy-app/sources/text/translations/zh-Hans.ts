@@ -219,8 +219,8 @@ export const zhHans: TranslationStructure = {
         disableAnalytics: '禁用分析',
         analyticsDisabled: '所有跟踪和遥测已禁用',
         analyticsEnabled: '匿名使用分析已启用',
-        imageUpload: '图片上传',
-        imageUploadSubtitle: '将图片附加到消息中，以便受支持的代理进行分析',
+        attachments: '文件附件',
+        attachmentsSubtitle: '将图片、文件和文档附加到消息中，以便受支持的代理分析',
     },
 
     errors: {
@@ -977,19 +977,19 @@ export const zhHans: TranslationStructure = {
         noData: '暂无使用数据',
     },
 
-    imageUpload: {
-        permissionTitle: '访问照片库',
-        permissionMessage: '允许访问您的照片库以在消息中附加图片。',
-        limitTitle: '已达到图片限制',
-        limitMessage: ({ max }: { max: number }) => `每条消息最多可附加 ${max} 张图片。`,
+    attachments: {
+        permissionTitle: '访问附件',
+        permissionMessage: '允许访问文件以在消息中添加附件。',
+        limitTitle: '已达到附件限制',
+        limitMessage: ({ max }: { max: number }) => `每条消息最多可附加 ${max} 个文件。`,
         fileTooLargeTitle: '文件过大',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}"超过了 ${maxMb}MB 的限制，未能添加。`,
         uploadFailedTitle: '上传失败',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? '一张图片上传失败，未发送。'
-            : `${count} 张图片上传失败，未发送。`,
-        notSupportedTitle: '不支持图片',
-        notSupportedMessage: '此代理不支持图片附件。图片未发送。',
+            ? '一个附件上传失败，未发送。'
+            : `${count} 个附件上传失败，未发送。`,
+        notSupportedTitle: '不支持附件',
+        notSupportedMessage: '此代理不支持文件附件。附件未发送。',
     },
 
     feed: {

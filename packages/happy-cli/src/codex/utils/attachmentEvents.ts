@@ -18,7 +18,7 @@ export async function downloadCodexFileEventAttachment(
         }
         return {
             data: decrypted,
-            mimeType: ev.mimeType ?? 'image/jpeg',
+            mimeType: ev.mimeType ?? 'application/octet-stream',
             name: ev.name,
         };
     } catch (error) {

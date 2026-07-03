@@ -119,9 +119,9 @@ export default function FeaturesSettingsScreen() {
                     showChevron={false}
                 />
                 <Item
-                    title={t('settingsFeatures.imageUpload')}
-                    subtitle={t('settingsFeatures.imageUploadSubtitle')}
-                    icon={<Ionicons name="image-outline" size={29} color="#FF2D55" />}
+                    title={t('settingsFeatures.attachments')}
+                    subtitle={t('settingsFeatures.attachmentsSubtitle')}
+                    icon={<Ionicons name="attach-outline" size={29} color="#FF2D55" />}
                     rightElement={
                         <Switch
                             value={expImageUpload}

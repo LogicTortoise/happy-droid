@@ -1,28 +1,35 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    getAttachmentSendPlan,
     getImageAttachmentSendPlan,
+    supportsAttachmentsForFlavor,
     supportsImageAttachmentsForFlavor,
 } from './attachmentSupport';
 
-describe('supportsImageAttachmentsForFlavor', () => {
+describe('supportsAttachmentsForFlavor', () => {
     it('supports legacy sessions, Claude, and Codex', () => {
-        expect(supportsImageAttachmentsForFlavor(undefined)).toBe(true);
-        expect(supportsImageAttachmentsForFlavor(null)).toBe(true);
-        expect(supportsImageAttachmentsForFlavor('claude')).toBe(true);
-        expect(supportsImageAttachmentsForFlavor('codex')).toBe(true);
+        expect(supportsAttachmentsForFlavor(undefined)).toBe(true);
+        expect(supportsAttachmentsForFlavor(null)).toBe(true);
+        expect(supportsAttachmentsForFlavor('claude')).toBe(true);
+        expect(supportsAttachmentsForFlavor('codex')).toBe(true);
     });
 
     it('rejects Gemini, OpenClaw, and unknown explicit flavors', () => {
-        expect(supportsImageAttachmentsForFlavor('gemini')).toBe(false);
-        expect(supportsImageAttachmentsForFlavor('openclaw')).toBe(false);
-        expect(supportsImageAttachmentsForFlavor('custom-agent')).toBe(false);
+        expect(supportsAttachmentsForFlavor('gemini')).toBe(false);
+        expect(supportsAttachmentsForFlavor('openclaw')).toBe(false);
+        expect(supportsAttachmentsForFlavor('custom-agent')).toBe(false);
+    });
+
+    it('keeps legacy image-named exports as aliases', () => {
+        expect(supportsImageAttachmentsForFlavor).toBe(supportsAttachmentsForFlavor);
+        expect(getImageAttachmentSendPlan).toBe(getAttachmentSendPlan);
     });
 });
 
-describe('getImageAttachmentSendPlan', () => {
+describe('getAttachmentSendPlan', () => {
     it('uses attachments and sends text for Codex', () => {
-        expect(getImageAttachmentSendPlan({
+        expect(getAttachmentSendPlan({
             flavor: 'codex',
             text: '',
             attachmentCount: 1,
@@ -35,7 +42,7 @@ describe('getImageAttachmentSendPlan', () => {
     });
 
     it('warns but still sends non-empty text for unsupported agents', () => {
-        expect(getImageAttachmentSendPlan({
+        expect(getAttachmentSendPlan({
             flavor: 'gemini',
             text: 'describe this',
             attachmentCount: 1,
@@ -48,7 +55,7 @@ describe('getImageAttachmentSendPlan', () => {
     });
 
     it('warns and sends nothing for unsupported image-only messages', () => {
-        expect(getImageAttachmentSendPlan({
+        expect(getAttachmentSendPlan({
             flavor: 'openclaw',
             text: '   ',
             attachmentCount: 2,

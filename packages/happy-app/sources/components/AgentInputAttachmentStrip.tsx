@@ -1,14 +1,13 @@
 /**
- * Horizontal scrollable strip showing selected image attachment thumbnails.
- * Each thumbnail shows the image with a remove button.
- * Uses thumbhash as a blurry placeholder while the full image loads.
+ * Horizontal scrollable strip showing selected attachment previews.
+ * Images render as thumbnails; generic files render as compact file tiles.
  */
 import * as React from 'react';
-import { ScrollView, View, Pressable } from 'react-native';
+import { ScrollView, View, Pressable, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import type { AttachmentPreview } from '@/sync/attachmentTypes';
+import { isImageAttachment, type AttachmentPreview } from '@/sync/attachmentTypes';
 import { thumbhashToDataUri } from '@/utils/thumbhash';
 
 const THUMB_SIZE = 64;
@@ -53,6 +52,7 @@ function AttachmentThumbnail({
     onRemove: (id: string) => void;
     theme: any;
 }) {
+    const isImage = isImageAttachment(image);
     // Build placeholder from thumbhash if available
     const placeholder = React.useMemo(() => {
         if (!image.thumbhash) return undefined;
@@ -65,13 +65,25 @@ function AttachmentThumbnail({
             styles.thumbContainer,
             { borderColor: theme.colors.divider }
         ]}>
-            <Image
-                source={{ uri: image.uri }}
-                placeholder={placeholder}
-                style={[{ width: THUMB_SIZE, height: THUMB_SIZE }, styles.thumb]}
-                contentFit="cover"
-                transition={150}
-            />
+            {isImage ? (
+                <Image
+                    source={{ uri: image.uri }}
+                    placeholder={placeholder}
+                    style={[{ width: THUMB_SIZE, height: THUMB_SIZE }, styles.thumb]}
+                    contentFit="cover"
+                    transition={150}
+                />
+            ) : (
+                <View style={[styles.fileTile, { backgroundColor: theme.colors.surfaceHigh }]}>
+                    <Ionicons name="document-text-outline" size={22} color={theme.colors.textSecondary} />
+                    <Text
+                        style={[styles.fileName, { color: theme.colors.textSecondary }]}
+                        numberOfLines={2}
+                    >
+                        {image.name}
+                    </Text>
+                </View>
+            )}
             {/* Remove button */}
             <Pressable
                 onPress={() => onRemove(image.id)}
@@ -107,6 +119,21 @@ const styles = StyleSheet.create(() => ({
     },
     thumb: {
         borderRadius: BORDER_RADIUS,
+    },
+    fileTile: {
+        width: THUMB_SIZE,
+        height: THUMB_SIZE,
+        borderRadius: BORDER_RADIUS,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+        gap: 4,
+    },
+    fileName: {
+        fontSize: 9,
+        lineHeight: 11,
+        textAlign: 'center',
+        fontWeight: '500',
     },
     removeButton: {
         position: 'absolute',

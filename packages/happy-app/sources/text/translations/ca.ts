@@ -218,8 +218,8 @@ export const ca: TranslationStructure = {
         disableAnalytics: 'Desactivar analítica',
         analyticsDisabled: 'Tot el seguiment i telemetria desactivats',
         analyticsEnabled: 'Analítica anònima d\'ús activa',
-        imageUpload: 'Pujada d\'imatges',
-        imageUploadSubtitle: 'Adjunta imatges als missatges perquè els agents compatibles les analitzin',
+        attachments: 'Fitxers adjunts',
+        attachmentsSubtitle: 'Adjunta imatges, fitxers i documents perquè els agents compatibles els analitzin',
     },
 
     errors: {
@@ -976,19 +976,19 @@ export const ca: TranslationStructure = {
         noData: "No hi ha dades d'ús disponibles",
     },
 
-    imageUpload: {
-        permissionTitle: 'Accés a la biblioteca de fotos',
-        permissionMessage: "Permet l'accés a la teva biblioteca de fotos per adjuntar imatges als missatges.",
-        limitTitle: "Límit d'imatges assolit",
-        limitMessage: ({ max }: { max: number }) => `Pots adjuntar fins a ${max} imatges per missatge.`,
+    attachments: {
+        permissionTitle: 'Accés als adjunts',
+        permissionMessage: "Permet l'accés per adjuntar fitxers als missatges.",
+        limitTitle: "Límit d'adjunts assolit",
+        limitMessage: ({ max }: { max: number }) => `Pots adjuntar fins a ${max} fitxers per missatge.`,
         fileTooLargeTitle: 'Fitxer massa gran',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}" supera el límit de ${maxMb}MB i no s'ha afegit.`,
         uploadFailedTitle: 'Error en la càrrega',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? 'No s\'ha pogut pujar una imatge i no s\'ha enviat.'
-            : `No s'han pogut pujar ${count} imatges i no s'han enviat.`,
-        notSupportedTitle: 'Imatges no compatibles',
-        notSupportedMessage: 'Aquest agent no admet fitxers adjunts d\'imatge. Les imatges no s\'han enviat.',
+            ? 'No s\'ha pogut pujar un adjunt i no s\'ha enviat.'
+            : `No s'han pogut pujar ${count} adjunts i no s'han enviat.`,
+        notSupportedTitle: 'Adjunts no compatibles',
+        notSupportedMessage: 'Aquest agent no admet fitxers adjunts. Els adjunts no s\'han enviat.',
     },
 
     feed: {

@@ -1,11 +1,10 @@
 /**
- * View for 'file' tool calls (image attachments sent by user).
- * Downloads and decrypts the encrypted blob via apiAttachments + sessionBlobKey,
- * then renders the full image inline with the thumbhash as placeholder.
+ * View for 'file' tool calls (attachments sent by user).
+ * Image attachments download/decrypt and render inline. Generic files render as
+ * compact file rows; the backend ref is still carried in the tool input.
  *
- * Always renders inline when a ref is present — if dimensions are missing
- * (older messages, iOS picker that didn't report w/h), a default 4:3 aspect
- * ratio is used until the actual image lands and contentFit shows it.
+ * Image events require image{} metadata to render inline. File-only events stay
+ * compact so documents do not try to load through the image renderer.
  */
 import * as React from 'react';
 import { View, Text } from 'react-native';
@@ -38,7 +37,7 @@ export const FileView = React.memo<ToolViewProps>(({ tool, sessionId }) => {
     const parsed = fileInputSchema.safeParse(tool.input);
     if (!parsed.success) return null;
 
-    const { name, image, ref } = parsed.data;
+    const { name, image, ref, size } = parsed.data;
 
     const placeholder = React.useMemo(() => {
         if (!image?.thumbhash) return undefined;
@@ -46,7 +45,23 @@ export const FileView = React.memo<ToolViewProps>(({ tool, sessionId }) => {
         return uri ? { uri } : undefined;
     }, [image?.thumbhash]);
 
-    const { uri, error } = useAttachmentImage(sessionId ?? '', sessionId ? ref : undefined);
+    const { uri, error } = useAttachmentImage(sessionId ?? '', sessionId && image ? ref : undefined);
+
+    if (!image) {
+        return (
+            <View style={[styles.fileRow, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                <Ionicons name="document-text-outline" size={20} color={theme.colors.textSecondary} />
+                <View style={styles.fileText}>
+                    <Text style={[styles.filename, { color: theme.colors.text }]} numberOfLines={1}>{name}</Text>
+                    {typeof size === 'number' && (
+                        <Text style={[styles.fileSize, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                            {formatFileSize(size)}
+                        </Text>
+                    )}
+                </View>
+            </View>
+        );
+    }
 
     // Pick display dimensions. Real w/h drives the aspect ratio when present,
     // but a missing image{} block (older messages, iOS picker that didn't
@@ -115,4 +130,30 @@ const styles = StyleSheet.create(() => ({
         fontSize: 13,
         fontWeight: '500',
     },
+    fileRow: {
+        marginHorizontal: 12,
+        marginVertical: 8,
+        borderRadius: BORDER_RADIUS,
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        maxWidth: 280,
+    },
+    fileText: {
+        flex: 1,
+        minWidth: 0,
+    },
+    fileSize: {
+        fontSize: 11,
+        marginTop: 2,
+    },
 }));
+
+function formatFileSize(size: number): string {
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}

@@ -85,3 +85,116 @@ Validation results:
 - FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
   - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
   - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-04 - P0 Generic File Attachment Upload
+
+Implementation:
+
+- Extended the existing attachment picker path from image-only selection to generic file/document selection with `expo-document-picker`.
+- Preserved image-specific metadata/thumbhash handling for image picker, web paste, and drag/drop sources when dimensions are available.
+- Generic files/documents now use the same encrypted attachment upload API and emit the existing `file` session event without image metadata.
+- Updated composer attachment previews so images render as thumbnails and non-image files render as compact document tiles.
+- Updated file tool rendering so non-image file events render as file rows instead of attempting inline image download/rendering.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/hooks/useImagePicker.test.ts sources/utils/pasteImages.web.test.ts sources/sync/attachmentSupport.test.ts sources/sync/typesRaw.spec.ts`
+  - 4 files / 71 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - 56 files / 699 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass, lockfile up to date.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-04 - AI Review Follow-up: Generic Attachment Consumption
+
+Implementation:
+
+- Propagated attachment `mimeType` from happy-app previews through uploaded attachment records and `file` session events.
+- Restored the native image picker as a separate image button and kept the document picker as a separate file button, so selected images keep dimensions/thumbhash metadata when available.
+- Added Codex attachment preparation for text-readable files and explicit unsupported-file notices for PDFs/binary documents instead of silently skipping them.
+- Reused the same image/text/unsupported attachment handling for Claude remote content blocks.
+- Changed missing CLI attachment MIME fallback from `image/jpeg` to `application/octet-stream`.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/typesRaw.spec.ts sources/hooks/useImagePicker.test.ts sources/utils/pasteImages.web.test.ts sources/sync/attachmentSupport.test.ts`
+  - 4 files / 71 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `pnpm --filter happy exec vitest run src/codex/utils/imageInput.test.ts src/codex/utils/attachmentEvents.test.ts`
+  - 2 files / 16 tests. The command also ran the existing happy CLI build hook successfully.
+- PASS: `pnpm --filter happy typecheck`
+- PASS: `pnpm --filter @slopus/happy-wire test`
+  - 2 files / 19 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 56 files / 699 tests.
+- PASS: `pnpm --filter happy-app exec vitest run sources/encryption/blob.test.ts`
+  - 1 file / 9 tests. This confirmed a transient full-suite failure was not caused by the attachment changes.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-04 - AI Review Follow-up: Document Content and Attachment UX
+
+Implementation:
+
+- Updated canonical `@slopus/happy-wire` file event schema so image `thumbhash` is optional, matching app/CLI behavior.
+- Replaced generic unsupported-file notices in Claude/Codex attachment handoff with content delivery:
+  - text files are inlined as text;
+  - PDF text is extracted from common PDF text streams/operators;
+  - OOXML Office documents (`.docx`, `.pptx`, `.xlsx`) are extracted from zip XML content;
+  - remaining binary files are passed as base64 text blocks with truncation markers.
+- Renamed user-visible attachment strings and i18n keys from `imageUpload`/image wording to generic `attachments`/file wording across all bundled languages.
+- Fixed attachment-only composer state so the send button shows the send arrow instead of the microphone when attachments are selected.
+
+Validation results:
+
+- PASS: `pnpm --filter @slopus/happy-wire test`
+  - 2 files / 19 tests.
+- PASS: `pnpm --filter happy exec vitest run src/codex/utils/imageInput.test.ts src/codex/utils/attachmentEvents.test.ts`
+  - 2 files / 18 tests, covering PDF text extraction, OOXML text extraction, and binary base64 handoff.
+- PASS: `pnpm --filter happy typecheck`
+- PASS: `pnpm --filter happy-app typecheck`
+  - Initial parallel run failed while `@slopus/happy-wire` was rebuilding dist; rerun after wire build completed passed.
+- PASS: `pnpm --filter happy-app exec vitest run sources/hooks/useImagePicker.test.ts sources/sync/typesRaw.spec.ts sources/sync/attachmentSupport.test.ts sources/utils/pasteImages.web.test.ts`
+  - 4 files / 71 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 56 files / 699 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-04 - Validation Follow-up: CLI Session Protocol Schema Test
+
+Implementation:
+
+- Updated `packages/happy-cli/src/sessionProtocol/types.test.ts` to match canonical `@slopus/happy-wire` file event behavior.
+- Complete image metadata is now accepted, including optional `thumbhash`.
+- Malformed image metadata is rejected only when required dimensions are missing.
+
+Validation results:
+
+- PASS: `pnpm --filter happy exec vitest run src/sessionProtocol/types.test.ts`
+  - 1 file / 9 tests.
+  - An initial parallel run failed while quick validation was rebuilding `@slopus/happy-wire` dist; rerun after quick completed passed.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.

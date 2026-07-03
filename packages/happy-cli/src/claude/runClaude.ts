@@ -625,7 +625,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
                     return null;
                 }
                 logger.debug(`[loop] Attachment decrypted: ${ev.name} (${decrypted.length} bytes)`);
-                return { data: decrypted, mimeType: ev.mimeType ?? 'image/jpeg', name: ev.name };
+                return { data: decrypted, mimeType: ev.mimeType ?? 'application/octet-stream', name: ev.name };
             } catch (error) {
                 logger.debug(`[loop] Failed to download attachment: ${ev.name}`, { error });
                 return null;

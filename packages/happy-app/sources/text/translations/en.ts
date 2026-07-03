@@ -232,8 +232,8 @@ export const en: TranslationStructure = {
         disableAnalytics: 'Disable Analytics',
         analyticsDisabled: 'All tracking and telemetry disabled',
         analyticsEnabled: 'Anonymous usage analytics active',
-        imageUpload: 'Image Upload',
-        imageUploadSubtitle: 'Attach images to messages for supported agents to analyze',
+        attachments: 'File Attachments',
+        attachmentsSubtitle: 'Attach images, files, and documents for supported agents to analyze',
     },
 
     errors: {
@@ -991,19 +991,19 @@ export const en: TranslationStructure = {
         noData: 'No usage data available',
     },
 
-    imageUpload: {
-        permissionTitle: 'Photo Library Access',
-        permissionMessage: 'Allow access to your photo library to attach images to messages.',
-        limitTitle: 'Image Limit Reached',
-        limitMessage: ({ max }: { max: number }) => `You can attach up to ${max} images per message.`,
+    attachments: {
+        permissionTitle: 'Attachment Access',
+        permissionMessage: 'Allow access to attach files to messages.',
+        limitTitle: 'Attachment Limit Reached',
+        limitMessage: ({ max }: { max: number }) => `You can attach up to ${max} files per message.`,
         fileTooLargeTitle: 'File Too Large',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}" exceeds the ${maxMb}MB limit and was not added.`,
         uploadFailedTitle: 'Upload Failed',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? 'One image could not be uploaded and was not sent.'
-            : `${count} images could not be uploaded and were not sent.`,
-        notSupportedTitle: 'Images Not Supported',
-        notSupportedMessage: 'This agent does not support image attachments. Images were not sent.',
+            ? 'One attachment could not be uploaded and was not sent.'
+            : `${count} attachments could not be uploaded and were not sent.`,
+        notSupportedTitle: 'Attachments Not Supported',
+        notSupportedMessage: 'This agent does not support file attachments. Attachments were not sent.',
     },
 
     feed: {

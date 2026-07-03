@@ -15,6 +15,7 @@ vi.mock('@/configuration', () => ({
 import { logger } from '@/ui/logger';
 import {
     detectSupportedImageType,
+    prepareCodexAttachmentInputItems,
     prepareCodexImageInputItems,
     resolveCodexImageCacheDir,
 } from './imageInput';
@@ -25,6 +26,50 @@ async function makeTempDir(): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'happy-codex-image-input-'));
     tempDirs.push(dir);
     return dir;
+}
+
+function createStoredZip(entries: Record<string, string>): Uint8Array {
+    const localParts: Buffer[] = [];
+    const centralParts: Buffer[] = [];
+    let offset = 0;
+
+    for (const [name, text] of Object.entries(entries)) {
+        const nameBuffer = Buffer.from(name, 'utf8');
+        const content = Buffer.from(text, 'utf8');
+        const local = Buffer.alloc(30);
+        local.writeUInt32LE(0x04034b50, 0);
+        local.writeUInt16LE(20, 4);
+        local.writeUInt16LE(0, 8);
+        local.writeUInt32LE(0, 14);
+        local.writeUInt32LE(content.length, 18);
+        local.writeUInt32LE(content.length, 22);
+        local.writeUInt16LE(nameBuffer.length, 26);
+        localParts.push(local, nameBuffer, content);
+
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(0x02014b50, 0);
+        central.writeUInt16LE(20, 4);
+        central.writeUInt16LE(20, 6);
+        central.writeUInt16LE(0, 10);
+        central.writeUInt32LE(0, 16);
+        central.writeUInt32LE(content.length, 20);
+        central.writeUInt32LE(content.length, 24);
+        central.writeUInt16LE(nameBuffer.length, 28);
+        central.writeUInt32LE(offset, 42);
+        centralParts.push(central, nameBuffer);
+
+        offset += local.length + nameBuffer.length + content.length;
+    }
+
+    const centralDirectory = Buffer.concat(centralParts);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(Object.keys(entries).length, 8);
+    end.writeUInt16LE(Object.keys(entries).length, 10);
+    end.writeUInt32LE(centralDirectory.length, 12);
+    end.writeUInt32LE(offset, 16);
+
+    return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
 afterEach(async () => {
@@ -152,6 +197,122 @@ describe('prepareCodexImageInputItems', () => {
         });
         expect(JSON.stringify(vi.mocked(logger.debug).mock.calls)).not.toContain(fileRoot);
         expect(JSON.stringify(vi.mocked(logger.debug).mock.calls)).not.toContain(sensitiveName);
+    });
+});
+
+describe('prepareCodexAttachmentInputItems', () => {
+    it('keeps supported images as localImage inputs', async () => {
+        const cacheRootDir = await makeTempDir();
+        const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+        const result = await prepareCodexAttachmentInputItems([{
+            data: pngBytes,
+            mimeType: 'image/heic',
+            name: 'photo.heic',
+        }], {
+            cacheRootDir,
+            sessionId: 'session-attachment-image',
+        });
+
+        expect(result.skipped).toBe(0);
+        expect(result.inputItems).toHaveLength(1);
+        expect(result.inputItems[0].type).toBe('localImage');
+    });
+
+    it('inlines text file attachments for Codex consumption', async () => {
+        const result = await prepareCodexAttachmentInputItems([{
+            data: new TextEncoder().encode('hello from a note'),
+            mimeType: 'text/plain',
+            name: 'note.txt',
+        }], {
+            cacheRootDir: await makeTempDir(),
+            sessionId: 'session-text',
+        });
+
+        expect(result.skipped).toBe(0);
+        expect(result.inputItems).toHaveLength(1);
+        expect(result.inputItems[0]).toMatchObject({
+            type: 'text',
+            text: expect.stringContaining('hello from a note'),
+        });
+        expect(result.inputItems[0]).toMatchObject({
+            text: expect.stringContaining('note.txt'),
+        });
+    });
+
+    it('extracts PDF text instead of sending an unsupported notice', async () => {
+        const pdf = [
+            '%PDF-1.7',
+            '1 0 obj',
+            '<< /Length 44 >>',
+            'stream',
+            'BT /F1 12 Tf 72 712 Td (Quarterly PDF text) Tj ET',
+            'endstream',
+            'endobj',
+            '%%EOF',
+        ].join('\n');
+
+        const result = await prepareCodexAttachmentInputItems([{
+            data: new TextEncoder().encode(pdf),
+            mimeType: 'application/pdf',
+            name: 'report.pdf',
+        }], {
+            cacheRootDir: await makeTempDir(),
+            sessionId: 'session-pdf',
+        });
+
+        expect(result.skipped).toBe(0);
+        expect(result.inputItems).toHaveLength(1);
+        expect(result.inputItems[0]).toMatchObject({
+            type: 'text',
+            text: expect.stringContaining('report.pdf'),
+        });
+        expect(result.inputItems[0]).toMatchObject({
+            text: expect.stringContaining('Quarterly PDF text'),
+        });
+    });
+
+    it('extracts Office Open XML document text', async () => {
+        const docx = createStoredZip({
+            'word/document.xml': '<w:document><w:body><w:p><w:r><w:t>DOCX body text</w:t></w:r></w:p></w:body></w:document>',
+        });
+
+        const result = await prepareCodexAttachmentInputItems([{
+            data: docx,
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            name: 'notes.docx',
+        }], {
+            cacheRootDir: await makeTempDir(),
+            sessionId: 'session-docx',
+        });
+
+        expect(result.skipped).toBe(0);
+        expect(result.inputItems).toHaveLength(1);
+        expect(result.inputItems[0]).toMatchObject({
+            type: 'text',
+            text: expect.stringContaining('DOCX body text'),
+        });
+    });
+
+    it('passes unknown binary document content as base64 instead of only a notice', async () => {
+        const result = await prepareCodexAttachmentInputItems([{
+            data: new Uint8Array([0, 1, 2, 3, 4, 5]),
+            mimeType: 'application/octet-stream',
+            name: 'archive.bin',
+        }], {
+            cacheRootDir: await makeTempDir(),
+            sessionId: 'session-binary',
+        });
+
+        expect(result.skipped).toBe(0);
+        expect(result.inputItems).toHaveLength(1);
+        expect(result.inputItems[0]).toMatchObject({
+            type: 'text',
+            text: expect.stringContaining('AAECAwQF'),
+        });
+        expect(result.inputItems[0]).toMatchObject({
+            text: expect.not.stringContaining('cannot extract text'),
+        });
     });
 });
 

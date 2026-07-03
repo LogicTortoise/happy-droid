@@ -43,7 +43,7 @@ describe('downloadCodexFileEventAttachment', () => {
         expect(session.downloadAndDecryptAttachment).toHaveBeenCalledWith('attachment-ref');
     });
 
-    it('defaults missing MIME type to image/jpeg', async () => {
+    it('defaults missing MIME type to application/octet-stream', async () => {
         const data = new Uint8Array([1, 2, 3]);
         const session = {
             downloadAndDecryptAttachment: vi.fn().mockResolvedValue(data),
@@ -51,7 +51,7 @@ describe('downloadCodexFileEventAttachment', () => {
 
         await expect(downloadCodexFileEventAttachment(session, fileEvent({ mimeType: null }))).resolves.toEqual({
             data,
-            mimeType: 'image/jpeg',
+            mimeType: 'application/octet-stream',
             name: 'image.png',
         });
     });

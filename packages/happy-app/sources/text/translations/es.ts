@@ -218,8 +218,8 @@ export const es: TranslationStructure = {
         disableAnalytics: 'Desactivar analítica',
         analyticsDisabled: 'Todo el seguimiento y telemetría desactivados',
         analyticsEnabled: 'Analítica anónima de uso activa',
-        imageUpload: 'Subida de imágenes',
-        imageUploadSubtitle: 'Adjunta imágenes a los mensajes para que los agentes compatibles las analicen',
+        attachments: 'Archivos adjuntos',
+        attachmentsSubtitle: 'Adjunta imágenes, archivos y documentos para que los agentes compatibles los analicen',
     },
 
     errors: {
@@ -977,19 +977,19 @@ export const es: TranslationStructure = {
         noData: 'No hay datos de uso disponibles',
     },
 
-    imageUpload: {
-        permissionTitle: 'Acceso a la biblioteca de fotos',
-        permissionMessage: 'Permite el acceso a tu biblioteca de fotos para adjuntar imágenes a los mensajes.',
-        limitTitle: 'Límite de imágenes alcanzado',
-        limitMessage: ({ max }: { max: number }) => `Puedes adjuntar hasta ${max} imágenes por mensaje.`,
+    attachments: {
+        permissionTitle: 'Acceso a adjuntos',
+        permissionMessage: 'Permite el acceso para adjuntar archivos a los mensajes.',
+        limitTitle: 'Límite de adjuntos alcanzado',
+        limitMessage: ({ max }: { max: number }) => `Puedes adjuntar hasta ${max} archivos por mensaje.`,
         fileTooLargeTitle: 'Archivo demasiado grande',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}" supera el límite de ${maxMb}MB y no se añadió.`,
         uploadFailedTitle: 'Error al subir',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? 'No se pudo subir una imagen y no se envió.'
-            : `No se pudieron subir ${count} imágenes y no se enviaron.`,
-        notSupportedTitle: 'Imágenes no compatibles',
-        notSupportedMessage: 'Este agente no admite archivos adjuntos de imagen. Las imágenes no se enviaron.',
+            ? 'No se pudo subir un adjunto y no se envió.'
+            : `No se pudieron subir ${count} adjuntos y no se enviaron.`,
+        notSupportedTitle: 'Adjuntos no compatibles',
+        notSupportedMessage: 'Este agente no admite archivos adjuntos. Los adjuntos no se enviaron.',
     },
 
     feed: {

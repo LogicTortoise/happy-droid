@@ -5,7 +5,7 @@ import { AuthCredentials } from '@/auth/tokenStorage';
 import { Encryption } from '@/sync/encryption/encryption';
 import { decodeBase64, encodeBase64 } from '@/encryption/base64';
 import { storage } from './storage';
-import { getImageAttachmentSendPlan } from './attachmentSupport';
+import { getAttachmentSendPlan } from './attachmentSupport';
 import {
     errorMessageFromUnknown,
     formatAttachmentDiagnosticForLog,
@@ -56,7 +56,7 @@ import { fetchFeed } from './apiFeed';
 import { FeedItem } from './feedTypes';
 import { UserProfile } from './friendTypes';
 import { resolveMessageModeMeta } from './messageMeta';
-import type { AttachmentPreview, UploadedAttachment } from './attachmentTypes';
+import { hasImageMetadata, type AttachmentPreview, type UploadedAttachment } from './attachmentTypes';
 import { requestAttachmentUpload, uploadEncryptedBlob } from './apiAttachments';
 import { encryptBlob } from '@/encryption/blob';
 import { readFileBytes } from '@/utils/readFileBytes';
@@ -93,7 +93,7 @@ type OutboxMessage = {
 type SendMessageOptions = {
     displayText?: string;
     source?: MessageSentSource;
-    /** Optional image attachments to send before the text message. */
+    /** Optional attachments to send before the text message. */
     attachments?: AttachmentPreview[];
 };
 
@@ -499,7 +499,7 @@ class Sync {
     }
 
     /**
-     * Upload image attachments for a session: read bytes → encrypt → upload to server.
+     * Upload attachments for a session: read bytes → encrypt → upload to server.
      * Returns UploadedAttachment records to embed as file events before the text message.
      * Failures are logged and skipped rather than aborting the whole message send.
      */
@@ -536,6 +536,7 @@ class Sync {
                 uploaded.push({
                     ref,
                     name: attachment.name,
+                    mimeType: attachment.mimeType,
                     size: attachment.size,
                     width: attachment.width,
                     height: attachment.height,
@@ -544,13 +545,13 @@ class Sync {
             } catch (err) {
                 const diagnostic = getAttachmentDiagnostic(err);
                 if (diagnostic) {
-                    console.error('[attachments] Failed to upload image attachment:', formatAttachmentDiagnosticForLog(diagnostic, {
+                console.error('[attachments] Failed to upload attachment:', formatAttachmentDiagnosticForLog(diagnostic, {
                         platform: Platform.OS,
                         client: getHappyClientId(),
                     }));
                 } else {
                     const message = errorMessageFromUnknown(err);
-                    console.error('[attachments] Failed to upload image attachment:', {
+                    console.error('[attachments] Failed to upload attachment:', {
                         leg: 'blob-upload',
                         message,
                         platform: Platform.OS,
@@ -594,7 +595,7 @@ class Sync {
         const { displayText, source = 'chat', attachments } = options ?? {};
 
         const flavor = session.metadata?.flavor;
-        const attachmentPlan = getImageAttachmentSendPlan({
+        const attachmentPlan = getAttachmentSendPlan({
             flavor,
             text,
             attachmentCount: attachments?.length ?? 0,
@@ -603,8 +604,8 @@ class Sync {
 
         if (attachmentPlan.shouldShowUnsupportedAlert) {
             Modal.alert(
-                t('imageUpload.notSupportedTitle'),
-                t('imageUpload.notSupportedMessage'),
+                t('attachments.notSupportedTitle'),
+                t('attachments.notSupportedMessage'),
                 [{ text: t('common.ok'), style: 'cancel' }],
             );
             if (!attachmentPlan.shouldSendText) {
@@ -618,8 +619,8 @@ class Sync {
 
             if (failed > 0) {
                 Modal.alert(
-                    t('imageUpload.uploadFailedTitle'),
-                    t('imageUpload.uploadFailedMessage', { count: failed }),
+                    t('attachments.uploadFailedTitle'),
+                    t('attachments.uploadFailedMessage', { count: failed }),
                     [{ text: t('common.ok'), style: 'cancel' }],
                 );
             }
@@ -644,6 +645,7 @@ class Sync {
                                     t: 'file',
                                     ref: att.ref,
                                     name: att.name,
+                                    mimeType: att.mimeType,
                                     size: att.size,
                                     // Include image metadata when we have dimensions; thumbhash is
                                     // optional. The native iOS picker can't generate a thumbhash
@@ -651,7 +653,7 @@ class Sync {
                                     // bubble to a compact filename row instead of an inline picture.
                                     // FileView only needs w/h to size the inline render — placeholder
                                     // is absent, but the real image is decrypted on mount.
-                                    ...(att.width > 0 && att.height > 0
+                                    ...(hasImageMetadata(att)
                                         ? {
                                             image: {
                                                 width: att.width,

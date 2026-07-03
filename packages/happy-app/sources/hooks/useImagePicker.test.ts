@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
     platform: { OS: 'ios' },
     requestMediaLibraryPermissionsAsync: vi.fn(),
     launchImageLibraryAsync: vi.fn(),
+    getDocumentAsync: vi.fn(),
     manipulateAsync: vi.fn(),
     generateThumbhash: vi.fn(),
 }));
@@ -15,6 +16,10 @@ vi.mock('react-native', () => ({
 vi.mock('expo-image-picker', () => ({
     requestMediaLibraryPermissionsAsync: mocks.requestMediaLibraryPermissionsAsync,
     launchImageLibraryAsync: mocks.launchImageLibraryAsync,
+}));
+
+vi.mock('expo-document-picker', () => ({
+    getDocumentAsync: mocks.getDocumentAsync,
 }));
 
 vi.mock('expo-image-manipulator', () => ({
@@ -34,7 +39,7 @@ vi.mock('@/utils/thumbhash', () => ({
     generateThumbhash: mocks.generateThumbhash,
 }));
 
-import { normalizePickedAssetForUpload } from './useImagePicker';
+import { normalizePickedAssetForUpload, normalizePickedDocumentForUpload } from './useImagePicker';
 
 describe('normalizePickedAssetForUpload', () => {
     beforeEach(() => {
@@ -69,5 +74,48 @@ describe('normalizePickedAssetForUpload', () => {
             width: 4032,
             height: 3024,
         });
+    });
+});
+
+describe('normalizePickedDocumentForUpload', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('normalizes arbitrary document picker assets for the attachment upload pipeline', () => {
+        const normalized = normalizePickedDocumentForUpload({
+            uri: 'file:///tmp/report.pdf',
+            name: 'report.pdf',
+            size: 123_456,
+            mimeType: 'application/pdf',
+            lastModified: 0,
+        });
+
+        expect(normalized).toMatchObject({
+            uri: 'file:///tmp/report.pdf',
+            width: 0,
+            height: 0,
+            mimeType: 'application/pdf',
+            size: 123_456,
+            name: 'report.pdf',
+        });
+        expect(normalized.id).toEqual(expect.any(String));
+    });
+
+    it('falls back when document metadata is missing', () => {
+        const normalized = normalizePickedDocumentForUpload({
+            uri: 'file:///tmp/blob',
+            name: '',
+            lastModified: 0,
+        });
+
+        expect(normalized).toMatchObject({
+            uri: 'file:///tmp/blob',
+            width: 0,
+            height: 0,
+            mimeType: 'application/octet-stream',
+            size: 0,
+        });
+        expect(normalized.name).toMatch(/^file_/);
     });
 });

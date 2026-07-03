@@ -86,9 +86,10 @@ interface AgentInputProps {
     isSending?: boolean;
     minHeight?: number;
     zenMode?: boolean;
-    /** Image attachments waiting to be sent (expImageUpload feature). */
+    /** Attachments waiting to be sent (expImageUpload feature). */
     selectedImages?: AttachmentPreview[];
     onPickImages?: () => void;
+    onPickFiles?: () => void;
     onRemoveImage?: (id: string) => void;
     onAddImages?: (images: AttachmentPreview[]) => void;
 }
@@ -553,10 +554,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // updated via startTransition from the keystroke handler so a busy reducer
     // never blocks the next character from landing in the textarea.
     const [hasText, setHasText] = React.useState(() => props.initialValue.trim().length > 0);
-    const hasImages = (props.selectedImages?.length ?? 0) > 0;
+    const hasAttachments = (props.selectedImages?.length ?? 0) > 0;
     const canPressSendButton = !props.isSending
         && !props.isSendDisabled
-        && (isSendBlocked ? (hasText || hasImages) : (hasText || hasImages || !!props.onMicPress));
+        && (isSendBlocked ? (hasText || hasAttachments) : (hasText || hasAttachments || !!props.onMicPress));
 
     // Check if this is a Codex, Gemini, or OpenClaw session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -613,7 +614,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // Forward ref to the MultiTextInput
     React.useImperativeHandle(ref, () => inputRef.current!, []);
 
-    // Web paste/drag — intercept image pastes and file drops for the
+    // Web paste/drag — intercept file pastes and file drops for the
     // attachment feature. Both handlers funnel through props.onAddImages.
     React.useEffect(() => {
         if (Platform.OS !== 'web' || !props.onAddImages) return;
@@ -629,8 +630,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 || (active instanceof HTMLElement && active.isContentEditable);
             if (!isEditableTarget) return;
 
-            const { getImagesFromClipboard, fileToAttachmentPreview } = await import('@/utils/pasteImages.web');
-            const files = getImagesFromClipboard(e);
+            const { getFilesFromClipboard, fileToAttachmentPreview } = await import('@/utils/pasteImages.web');
+            const files = getFilesFromClipboard(e);
             if (!files.length) return;
             e.preventDefault();
             const previews = (await Promise.all(
@@ -666,8 +667,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         const handleDrop = async (e: DragEvent) => {
             if (!isFileDrag(e)) return;
             e.preventDefault();
-            const { getImagesFromDrop, fileToAttachmentPreview } = await import('@/utils/pasteImages.web');
-            const files = getImagesFromDrop(e);
+            const { getFilesFromDrop, fileToAttachmentPreview } = await import('@/utils/pasteImages.web');
+            const files = getFilesFromDrop(e);
             if (!files.length) return;
             const previews = (await Promise.all(
                 files.map((f) => fileToAttachmentPreview(f, generateThumbhash))
@@ -799,10 +800,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     }, [props.onAbort]);
 
     const handleBlockedSendAttempt = React.useCallback(() => {
-        if (!isSendBlocked || !hasText || props.isSending) return;
+        if (!isSendBlocked || (!hasText && !hasAttachments) || props.isSending) return;
         hapticsError();
         sendBlockShakerRef.current?.shake();
-    }, [hasText, isSendBlocked, props.isSending]);
+    }, [hasAttachments, hasText, isSendBlocked, props.isSending]);
 
     const handleSendPress = React.useCallback(() => {
         if (isSendBlocked) {
@@ -814,12 +815,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         hapticsLight();
         // Live read avoids stalling behind the transitioned `hasText`.
         const liveHasText = (inputRef.current?.getText() ?? '').trim().length > 0;
-        if (liveHasText || hasImages) {
+        if (liveHasText || hasAttachments) {
             props.onSend();
         } else {
             props.onMicPress?.();
         }
-    }, [handleBlockedSendAttempt, hasImages, isSendBlocked, props.isSendDisabled, props.isSending, props.onSend, props.onMicPress]);
+    }, [handleBlockedSendAttempt, hasAttachments, isSendBlocked, props.isSendDisabled, props.isSending, props.onSend, props.onMicPress]);
 
     // Handle keyboard navigation
     const handleKeyPress = React.useCallback((event: KeyPressEvent): boolean => {
@@ -1348,6 +1349,31 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         />
                                     </Pressable>
                                 )}
+                                {/* File picker button (expImageUpload) */}
+                                {props.onPickFiles && (
+                                    <Pressable
+                                        onPress={props.onPickFiles}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="attach-outline"
+                                            size={16}
+                                            color={(props.selectedImages?.length ?? 0) > 0
+                                                ? theme.colors.radio.active
+                                                : theme.colors.button.secondary.tint}
+                                        />
+                                    </Pressable>
+                                )}
                                 </View>}
 
                                 {/* Send/Voice button - aligned with first row */}
@@ -1355,7 +1381,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     style={[
                                         styles.sendButton,
                                         isSendBlocked ? styles.sendButtonLocked :
-                                        (hasText || props.isSending || (props.onMicPress && !props.isMicActive))
+                                        (hasText || hasAttachments || props.isSending || (props.onMicPress && !props.isMicActive))
                                             ? styles.sendButtonActive
                                             : styles.sendButtonInactive
                                     ]}
@@ -1383,7 +1409,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 size={15}
                                                 color={theme.colors.textSecondary}
                                             />
-                                        ) : hasText ? (
+                                        ) : hasText || hasAttachments ? (
                                             <Octicons
                                                 name="arrow-up"
                                                 size={16}

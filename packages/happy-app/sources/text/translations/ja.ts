@@ -219,8 +219,8 @@ export const ja: TranslationStructure = {
         disableAnalytics: '分析を無効化',
         analyticsDisabled: 'すべてのトラッキングとテレメトリが無効',
         analyticsEnabled: '匿名の使用状況分析がアクティブ',
-        imageUpload: '画像アップロード',
-        imageUploadSubtitle: '対応エージェントに分析させるため、メッセージに画像を添付する',
+        attachments: 'ファイル添付',
+        attachmentsSubtitle: '対応エージェントが分析できるよう、画像、ファイル、文書を添付します',
     },
 
     errors: {
@@ -978,19 +978,19 @@ export const ja: TranslationStructure = {
         noData: '使用データがありません',
     },
 
-    imageUpload: {
-        permissionTitle: 'フォトライブラリへのアクセス',
-        permissionMessage: 'メッセージに画像を添付するには、フォトライブラリへのアクセスを許可してください。',
-        limitTitle: '画像の上限に達しました',
-        limitMessage: ({ max }: { max: number }) => `1メッセージに添付できる画像は最大${max}枚です。`,
+    attachments: {
+        permissionTitle: '添付ファイルへのアクセス',
+        permissionMessage: 'メッセージにファイルを添付するためのアクセスを許可してください。',
+        limitTitle: '添付ファイルの上限に達しました',
+        limitMessage: ({ max }: { max: number }) => `1メッセージに添付できるファイルは最大${max}個です。`,
         fileTooLargeTitle: 'ファイルが大きすぎます',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}"は${maxMb}MBの制限を超えているため追加されませんでした。`,
         uploadFailedTitle: 'アップロードに失敗しました',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? '1枚の画像をアップロードできず、送信されませんでした。'
-            : `${count}枚の画像をアップロードできず、送信されませんでした。`,
-        notSupportedTitle: '画像はサポートされていません',
-        notSupportedMessage: 'このエージェントは画像の添付に対応していません。画像は送信されませんでした。',
+            ? '1件の添付ファイルをアップロードできず、送信されませんでした。'
+            : `${count}件の添付ファイルをアップロードできず、送信されませんでした。`,
+        notSupportedTitle: '添付ファイルはサポートされていません',
+        notSupportedMessage: 'このエージェントはファイル添付に対応していません。添付ファイルは送信されませんでした。',
     },
 
     feed: {

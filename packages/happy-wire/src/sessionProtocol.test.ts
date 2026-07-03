@@ -31,6 +31,14 @@ describe('session protocol schemas', () => {
         mimeType: 'image/png',
         image: { thumbhash: 'abc', width: 100, height: 80 },
       },
+      {
+        t: 'file',
+        ref: 'upload-3',
+        name: 'photo-without-thumbhash.jpg',
+        size: 4096,
+        mimeType: 'image/jpeg',
+        image: { width: 640, height: 480 },
+      },
       { t: 'turn-start' },
       { t: 'start', title: 'Research agent' },
       { t: 'turn-end', status: 'completed' },
@@ -45,7 +53,7 @@ describe('session protocol schemas', () => {
   it('rejects malformed events', () => {
     expect(sessionEventSchema.safeParse({ t: 'tool-call-start', call: '1' }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x' }).success).toBe(false);
-    expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x', size: 1, image: { width: 10, height: 10 } }).success).toBe(false);
+    expect(sessionEventSchema.safeParse({ t: 'file', ref: 'x', name: 'x', size: 1, image: { width: 10 } }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'turn-end' }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'turn-end', status: 'canceled' }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: 'start', title: 1 }).success).toBe(false);

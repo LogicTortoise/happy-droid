@@ -204,8 +204,8 @@ export const ru: TranslationStructure = {
         disableAnalytics: 'Отключить аналитику',
         analyticsDisabled: 'Вся аналитика и телеметрия отключены',
         analyticsEnabled: 'Анонимная аналитика использования активна',
-        imageUpload: 'Загрузка изображений',
-        imageUploadSubtitle: 'Прикрепляйте изображения к сообщениям для анализа поддерживаемыми агентами',
+        attachments: 'Вложения файлов',
+        attachmentsSubtitle: 'Прикрепляйте изображения, файлы и документы для анализа поддерживаемыми агентами',
     },
 
     errors: {
@@ -1005,19 +1005,19 @@ export const ru: TranslationStructure = {
         noData: 'Данные об использовании недоступны',
     },
 
-    imageUpload: {
-        permissionTitle: 'Доступ к библиотеке фото',
-        permissionMessage: 'Разрешите доступ к вашей библиотеке фото, чтобы прикреплять изображения к сообщениям.',
-        limitTitle: 'Достигнут лимит изображений',
-        limitMessage: ({ max }: { max: number }) => `Можно прикрепить не более ${max} изображений на сообщение.`,
+    attachments: {
+        permissionTitle: 'Доступ к вложениям',
+        permissionMessage: 'Разрешите доступ, чтобы прикреплять файлы к сообщениям.',
+        limitTitle: 'Достигнут лимит вложений',
+        limitMessage: ({ max }: { max: number }) => `Можно прикрепить не более ${max} файлов на сообщение.`,
         fileTooLargeTitle: 'Файл слишком большой',
         fileTooLargeMessage: ({ name, maxMb }: { name: string; maxMb: number }) => `"${name}" превышает лимит ${maxMb}МБ и не был добавлен.`,
         uploadFailedTitle: 'Ошибка загрузки',
         uploadFailedMessage: ({ count }: { count: number }) => count === 1
-            ? 'Одно изображение не удалось загрузить — оно не было отправлено.'
-            : `${count} изображений не удалось загрузить — они не были отправлены.`,
-        notSupportedTitle: 'Изображения не поддерживаются',
-        notSupportedMessage: 'Этот агент не поддерживает вложения изображений. Изображения не были отправлены.',
+            ? 'Одно вложение не удалось загрузить — оно не было отправлено.'
+            : `${count} вложений не удалось загрузить — они не были отправлены.`,
+        notSupportedTitle: 'Вложения не поддерживаются',
+        notSupportedMessage: 'Этот агент не поддерживает файловые вложения. Вложения не были отправлены.',
     },
 
     feed: {
