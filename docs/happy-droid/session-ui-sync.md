@@ -117,3 +117,34 @@ App init / foreground / new-session socket event / manual refresh
 - 切换 UI 只基于 session id 导航。
 - 首条消息与后续消息都走 `/v3/sessions/{id}/messages`。
 - 单测覆盖 `machineSpawnNewSession()` / `machineResumeSession()` 的 RPC method 与 payload，防止 App 与 daemon contract 漂移。
+
+## 新建提交闭环状态与失败处理
+
+本轮补强新建页提交闭环，不改变后端协议。目标是让用户能明确看到当前卡在哪一步，并且所有失败都停留在新建页，可修改配置后重试。
+
+状态机：
+
+```text
+idle
+  -> creating-worktree   （仅 new worktree）
+  -> spawning-session    （machine RPC spawn-happy-session）
+  -> syncing-session     （refresh /v1/sessions，直到本地 storage 有 sessionId）
+  -> sending-message     （可选首条 prompt，走 /v3/sessions/{id}/messages）
+  -> navigating
+  -> idle
+```
+
+失败处理：
+
+- machine 未选中 / 离线：不进入提交状态，直接展示错误。
+- worktree 创建失败：状态回到 idle，保留输入和配置，展示错误。
+- spawn 返回 `requestToApproveDirectoryCreation`：状态回到 idle，弹确认；用户确认后重新进入状态机。
+- spawn 返回 `error` 或 RPC throw：状态回到 idle，展示 daemon/RPC 错误。
+- session 已创建但同步超时：状态回到 idle，保留返回的 session id，提示可刷新列表或稍后打开。
+- 首条消息发送失败：状态回到 idle，保留 session id 与 prompt，提示 session 已创建但首条消息未发送，可打开 session 后重试。
+
+UI 约束：
+
+- 提交期间禁用配置 picker、输入框和发送按钮，避免重复 spawn。
+- 发送按钮显示 spinner；输入框下方显示当前步骤文案。
+- 失败文案保留在 composer 下方，同时继续使用 Modal 作为显式提醒。

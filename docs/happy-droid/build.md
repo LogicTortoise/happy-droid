@@ -316,3 +316,52 @@ APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
 大小：452M
 SHA-256：1151f9e209f4b1c727b73733dcbf8d151b2b93ff29d5ee0b9983dfc5ba75f01e
 ```
+
+## 6. 新建 session 提交闭环构建验证（2026-07-03）
+
+本轮改动只涉及 App 新建页提交状态、失败展示和少量同步状态 helper。Android 构建仍使用与本机桥端对齐的后端 URL：
+
+```bash
+cd packages/happy-app
+APP_ENV=development npx expo prebuild -p android --no-install
+```
+
+```text
+结果：Finished prebuild
+日志：docs/happy-droid/logs/2026-07-03-new-session-submit-expo-prebuild.log
+```
+
+```bash
+cd packages/happy-app/android
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+```
+
+```text
+结果：BUILD SUCCESSFUL in 57s
+日志：docs/happy-droid/logs/2026-07-03-new-session-submit-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+大小：452M
+SHA-256：298c7f6840a8ae4134c91d9c5b8b990efda370a4722de8ed6ad7d7b462eb73f7
+```
+
+安装与启动验证：
+
+```text
+adb devices
+结果：127.0.0.1:5555 device
+
+adb -s 127.0.0.1:5555 install -r packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+结果：Success
+
+adb -s 127.0.0.1:5555 shell monkey -p com.slopus.happy.dev -c android.intent.category.LAUNCHER 1
+结果：Events injected: 1
+
+adb -s 127.0.0.1:5555 shell pidof com.slopus.happy.dev
+结果：8757
+
+adb -s 127.0.0.1:5555 shell dumpsys window | rg -n "mCurrentFocus|mFocusedApp|com.slopus.happy.dev"
+结果：mCurrentFocus / mFocusedApp 均为 com.slopus.happy.dev/expo.modules.devlauncher.launcher.DevLauncherActivity
+```

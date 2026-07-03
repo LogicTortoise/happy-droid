@@ -554,3 +554,82 @@ yarn workspace happy typecheck
 结果：tsc --noEmit passed
 日志：docs/happy-droid/logs/2026-07-03-voice-mode-runner-typecheck.log
 ```
+
+## 2026-07-03 - P1 新建 session 提交闭环状态与失败处理
+
+### 范围
+
+- 任务：完善 App 新建 session 提交流程的闭环状态与失败处理。
+- 改动范围：`packages/happy-app/sources/app/(app)/new/index.tsx`、`packages/happy-app/sources/sync/newSessionSubmitState.ts`、`docs/happy-droid/session-ui-sync.md`。
+- 未修改线上 `happy-telegram`、上游 `happy`、代理/网络/VPN/Tailscale 配置。
+
+### 实现结论
+
+新建页现在用显式状态机串起提交闭环：
+
+```text
+idle -> creating-worktree -> spawning-session -> syncing-session -> sending-message -> navigating -> idle
+```
+
+提交期间会禁用配置 picker、输入框和发送按钮，发送按钮显示 spinner，输入框下方显示当前步骤。machine 缺失/离线、worktree 创建失败、spawn RPC 失败、session 同步超时、首条消息发送异常都会回到 `idle`，保留用户输入和配置，并在 composer 下方与 Modal 中显示错误，便于修正后重试。
+
+### 单元测试
+
+```text
+yarn workspace happy-app test sources/sync/newSessionSubmitState.spec.ts sources/sync/ops.spec.ts --run --reporter verbose
+结果：2 test files passed, 6 tests passed
+日志：docs/happy-droid/logs/2026-07-03-new-session-submit-vitest.log
+```
+
+覆盖点：
+
+- 新建提交状态机只有 `idle` 可再次提交。
+- 每个提交步骤都有稳定的用户可见状态文案。
+- 既有 machine RPC `spawn-happy-session` / `resume-happy-session` payload contract 未回归。
+
+### 静态检查
+
+```text
+yarn workspace happy-app typecheck
+结果：passed
+日志：docs/happy-droid/logs/2026-07-03-new-session-submit-typecheck.log
+```
+
+### Android 构建与安装启动验证
+
+```text
+cd packages/happy-app
+APP_ENV=development npx expo prebuild -p android --no-install
+结果：Finished prebuild
+日志：docs/happy-droid/logs/2026-07-03-new-session-submit-expo-prebuild.log
+```
+
+```text
+cd packages/happy-app/android
+EXPO_PUBLIC_HAPPY_SERVER_URL=http://localhost:3005 \
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+ANDROID_HOME=/Users/Hht/Library/Android/sdk \
+./gradlew :app:assembleDebug --console=plain --no-daemon --max-workers=2
+结果：BUILD SUCCESSFUL in 57s
+日志：docs/happy-droid/logs/2026-07-03-new-session-submit-gradle-assembleDebug.log
+APK：packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+大小：452M
+SHA-256：298c7f6840a8ae4134c91d9c5b8b990efda370a4722de8ed6ad7d7b462eb73f7
+```
+
+```text
+adb devices
+结果：127.0.0.1:5555 device
+
+adb -s 127.0.0.1:5555 install -r packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk
+结果：Success
+
+adb -s 127.0.0.1:5555 shell monkey -p com.slopus.happy.dev -c android.intent.category.LAUNCHER 1
+结果：Events injected: 1
+
+adb -s 127.0.0.1:5555 shell pidof com.slopus.happy.dev
+结果：8757
+
+adb -s 127.0.0.1:5555 shell dumpsys window | rg -n "mCurrentFocus|mFocusedApp|com.slopus.happy.dev"
+结果：mCurrentFocus / mFocusedApp 均为 com.slopus.happy.dev/expo.modules.devlauncher.launcher.DevLauncherActivity
+```

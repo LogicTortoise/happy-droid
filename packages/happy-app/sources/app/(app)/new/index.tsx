@@ -36,6 +36,7 @@ import type { NewSessionAgentType } from '@/sync/persistence';
 import { sync } from '@/sync/sync';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { machineSpawnNewSession } from '@/sync/ops';
+import { getNewSessionSubmitStatusText, isNewSessionSubmitting, type NewSessionSubmitStep } from '@/sync/newSessionSubmitState';
 import { createWorktree, listWorktrees } from '@/utils/worktree';
 import { resolveAbsolutePath } from '@/utils/pathUtils';
 import { formatPathRelativeToHome, formatLastSeen } from '@/utils/sessionUtils';
@@ -513,7 +514,8 @@ function NewSessionScreen() {
     const [permissionIndex, setPermissionIndex] = React.useState(0);
     const [modelIndex, setModelIndex] = React.useState(0);
     const [effortIndex, setEffortIndex] = React.useState(0);
-    const [isSpawning, setIsSpawning] = React.useState(false);
+    const [submitStep, setSubmitStep] = React.useState<NewSessionSubmitStep>('idle');
+    const [submitError, setSubmitError] = React.useState<string | null>(null);
     const [activePicker, setActivePicker] = React.useState<PickerType | null>(null);
 
     // Config collapse — auto-collapses when typing, expands when empty
@@ -706,9 +708,13 @@ function NewSessionScreen() {
         setIsConfigExpanded(v => !v);
     }, []);
 
+    const isSubmitting = isNewSessionSubmitting(submitStep);
+    const submitStatusText = getNewSessionSubmitStatusText(submitStep);
+
     const togglePicker = React.useCallback((type: PickerType) => {
+        if (isSubmitting) return;
         setActivePicker(v => v === type ? null : type);
-    }, []);
+    }, [isSubmitting]);
 
     const cyclePermission = React.useCallback(() => {
         setPermissionIndex(i => {
@@ -794,16 +800,22 @@ function NewSessionScreen() {
 
     // Spawn session handler
     const handleSend = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
+        if (isSubmitting) {
+            return;
+        }
         if (!selectedMachineId || !selectedMachine) {
+            setSubmitError('Please select a machine');
             Modal.alert(t('common.error'), 'Please select a machine');
             return;
         }
         if (!isMachineOnline(selectedMachine)) {
+            setSubmitError('Machine is offline');
             Modal.alert(t('common.error'), 'Machine is offline');
             return;
         }
 
-        setIsSpawning(true);
+        setSubmitError(null);
+        setActivePicker(null);
         try {
             const pathToUse = trimPathInput(selectedPath) || '~';
             const absolutePath = resolveAbsolutePath(pathToUse, selectedMachine.metadata?.homeDir);
@@ -811,9 +823,12 @@ function NewSessionScreen() {
             // Handle worktree selection
             let spawnDirectory = absolutePath;
             if (worktreeKey === '__new__') {
+                setSubmitStep('creating-worktree');
                 const worktreeResult = await createWorktree(selectedMachineId, absolutePath);
                 if (!worktreeResult.success) {
-                    Modal.alert(t('common.error'), worktreeResult.error || 'Failed to create worktree');
+                    const message = worktreeResult.error || 'Failed to create worktree';
+                    setSubmitError(message);
+                    Modal.alert(t('common.error'), message);
                     return;
                 }
                 spawnDirectory = worktreeResult.worktreePath;
@@ -829,6 +844,7 @@ function NewSessionScreen() {
                 lastUsedModelMode: currentModelKey,
             });
 
+            setSubmitStep('spawning-session');
             const result = await machineSpawnNewSession({
                 machineId: selectedMachineId,
                 directory: spawnDirectory,
@@ -838,8 +854,11 @@ function NewSessionScreen() {
 
             switch (result.type) {
                 case 'success':
+                    setSubmitStep('syncing-session');
                     if (!(await waitForSpawnedSession(result.sessionId))) {
-                        Modal.alert(t('common.error'), 'Session was created, but it is not available in this app yet. Refresh sessions and try opening it from the list.');
+                        const message = `Session ${result.sessionId} was created, but it is not available in this app yet. Refresh sessions and try opening it from the list.`;
+                        setSubmitError(message);
+                        Modal.alert(t('common.error'), message);
                         return;
                     }
 
@@ -852,13 +871,16 @@ function NewSessionScreen() {
 
                     // Send initial message if provided
                     if (prompt.trim()) {
+                        setSubmitStep('sending-message');
                         await sync.sendMessage(result.sessionId, prompt.trim());
                     }
 
+                    setSubmitStep('navigating');
                     router.back();
                     navigateToSession(result.sessionId);
                     break;
                 case 'requestToApproveDirectoryCreation': {
+                    setSubmitStep('idle');
                     const approved = await Modal.confirm(
                         'Create Directory?',
                         `The directory '${result.directory}' does not exist. Would you like to create it?`,
@@ -870,6 +892,7 @@ function NewSessionScreen() {
                     break;
                 }
                 case 'error':
+                    setSubmitError(result.errorMessage);
                     Modal.alert(t('common.error'), result.errorMessage);
                     break;
             }
@@ -877,13 +900,14 @@ function NewSessionScreen() {
             const errorMessage = error instanceof Error
                 ? error.message
                 : 'Failed to start session';
+            setSubmitError(errorMessage);
             Modal.alert(t('common.error'), errorMessage);
         } finally {
-            setIsSpawning(false);
+            setSubmitStep('idle');
         }
-    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, prompt, router, navigateToSession, currentPermission.key, currentModelKey, worktreeKey]);
+    }, [isSubmitting, selectedMachineId, selectedMachine, selectedPath, selectedAgent, prompt, router, navigateToSession, currentPermission.key, currentModelKey, worktreeKey]);
 
-    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
+    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSubmitting;
 
     // Handle Enter/Cmd+Enter to send on web
     const handleKeyPress = React.useCallback((event: KeyPressEvent): boolean => {
@@ -915,7 +939,10 @@ function NewSessionScreen() {
                 <View style={{ maxWidth: layout.maxWidth, width: '100%', alignSelf: 'center', paddingHorizontal: 12, gap: 8, paddingTop: 12 }}>
 
                     {/* Config box */}
-                    <View style={styles.configBox}>
+                    <View
+                        style={[styles.configBox, isSubmitting && styles.submittingDisabled]}
+                        pointerEvents={isSubmitting ? 'none' : 'auto'}
+                    >
                         {isConfigExpanded ? (
                             <>
                                 {/* Machine row */}
@@ -1178,6 +1205,7 @@ function NewSessionScreen() {
                                     value={prompt}
                                     onChangeText={setPrompt}
                                     placeholder="What would you like to work on?"
+                                    editable={!isSubmitting}
                                     lineHeight={MULTI_TEXT_INPUT_LINE_HEIGHT}
                                     paddingTop={COMPOSER_INPUT_VERTICAL_PADDING}
                                     paddingBottom={COMPOSER_INPUT_VERTICAL_PADDING}
@@ -1200,7 +1228,7 @@ function NewSessionScreen() {
                                     disabled={!canSend}
                                     onPress={() => handleSend()}
                                 >
-                                    {isSpawning ? (
+                                    {isSubmitting ? (
                                         <ActivityIndicator
                                             size="small"
                                             color={theme.colors.button.primary.tint}
@@ -1217,6 +1245,23 @@ function NewSessionScreen() {
                             </View>
                         </View>
                     </View>
+                    {(submitStatusText || submitError) && (
+                        <View style={styles.submitStatusRow}>
+                            <Ionicons
+                                name={submitError ? 'alert-circle-outline' : 'time-outline'}
+                                size={14}
+                                color={submitError ? theme.colors.status.disconnected : theme.colors.textSecondary}
+                            />
+                            <Text
+                                style={[
+                                    styles.submitStatusText,
+                                    { color: submitError ? theme.colors.status.disconnected : theme.colors.textSecondary },
+                                ]}
+                            >
+                                {submitError ?? submitStatusText}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 <View style={{ height: Math.max(16, safeArea.bottom) }} />
@@ -1265,6 +1310,9 @@ const styles = StyleSheet.create((theme) => ({
         paddingVertical: 4,
         paddingHorizontal: 4,
         overflow: 'hidden',
+    },
+    submittingDisabled: {
+        opacity: 0.58,
     },
     popover: {
         borderRadius: 12,
@@ -1380,6 +1428,19 @@ const styles = StyleSheet.create((theme) => ({
     },
     sendButtonInactive: {
         backgroundColor: theme.colors.button.primary.disabled,
+    },
+    submitStatusRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 6,
+        paddingHorizontal: 8,
+        paddingBottom: 2,
+    },
+    submitStatusText: {
+        flex: 1,
+        fontSize: 12,
+        lineHeight: 16,
+        ...Typography.default(),
     },
     offlineHelp: {
         flexDirection: 'row',

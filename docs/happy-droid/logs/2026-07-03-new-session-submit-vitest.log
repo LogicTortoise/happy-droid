@@ -1,0 +1,20 @@
+yarn workspace v1.22.22
+yarn run v1.22.22
+$ vitest sources/sync/newSessionSubmitState.spec.ts sources/sync/ops.spec.ts --run --reporter verbose
+
+ RUN  v3.2.4 /Users/Hht/Documents/10.github/happy-droid/packages/happy-app
+
+ ✓ sources/sync/ops.spec.ts > session machine operations > spawns a daemon-backed session through machine RPC 31ms
+ ✓ sources/sync/ops.spec.ts > session machine operations > uses safe spawn defaults when optional fields are omitted 1ms
+ ✓ sources/sync/ops.spec.ts > session machine operations > returns an error result when spawn RPC fails 1ms
+ ✓ sources/sync/ops.spec.ts > session machine operations > resumes a session through the daemon machine RPC 0ms
+ ✓ sources/sync/newSessionSubmitState.spec.ts > new session submit state > marks only idle as not submitting 1ms
+ ✓ sources/sync/newSessionSubmitState.spec.ts > new session submit state > returns concise status text for visible submit phases 0ms
+
+ Test Files  2 passed (2)
+      Tests  6 passed (6)
+   Start at  19:34:45
+   Duration  454ms (transform 118ms, setup 0ms, collect 113ms, tests 35ms, environment 0ms, prepare 149ms)
+
+Done in 1.35s.
+Done in 1.50s.
