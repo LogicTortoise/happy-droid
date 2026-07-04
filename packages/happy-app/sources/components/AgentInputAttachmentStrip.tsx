@@ -14,14 +14,14 @@ const THUMB_SIZE = 64;
 const BORDER_RADIUS = 8;
 
 interface AgentInputAttachmentStripProps {
-    images: AttachmentPreview[];
+    attachments: AttachmentPreview[];
     onRemove: (id: string) => void;
 }
 
-export function AgentInputAttachmentStrip({ images, onRemove }: AgentInputAttachmentStripProps) {
+export function AgentInputAttachmentStrip({ attachments, onRemove }: AgentInputAttachmentStripProps) {
     const { theme } = useUnistyles();
 
-    if (images.length === 0) return null;
+    if (attachments.length === 0) return null;
 
     return (
         <ScrollView
@@ -31,10 +31,10 @@ export function AgentInputAttachmentStrip({ images, onRemove }: AgentInputAttach
             contentContainerStyle={styles.stripContent}
             keyboardShouldPersistTaps="always"
         >
-            {images.map((img) => (
+            {attachments.map((attachment) => (
                 <AttachmentThumbnail
-                    key={img.id}
-                    image={img}
+                    key={attachment.id}
+                    attachment={attachment}
                     onRemove={onRemove}
                     theme={theme}
                 />
@@ -44,21 +44,21 @@ export function AgentInputAttachmentStrip({ images, onRemove }: AgentInputAttach
 }
 
 function AttachmentThumbnail({
-    image,
+    attachment,
     onRemove,
     theme,
 }: {
-    image: AttachmentPreview;
+    attachment: AttachmentPreview;
     onRemove: (id: string) => void;
     theme: any;
 }) {
-    const isImage = isImageAttachment(image);
+    const isImage = isImageAttachment(attachment);
     // Build placeholder from thumbhash if available
     const placeholder = React.useMemo(() => {
-        if (!image.thumbhash) return undefined;
-        const uri = thumbhashToDataUri(image.thumbhash);
+        if (!attachment.thumbhash) return undefined;
+        const uri = thumbhashToDataUri(attachment.thumbhash);
         return uri ? { uri } : undefined;
-    }, [image.thumbhash]);
+    }, [attachment.thumbhash]);
 
     return (
         <View style={[
@@ -67,7 +67,7 @@ function AttachmentThumbnail({
         ]}>
             {isImage ? (
                 <Image
-                    source={{ uri: image.uri }}
+                    source={{ uri: attachment.uri }}
                     placeholder={placeholder}
                     style={[{ width: THUMB_SIZE, height: THUMB_SIZE }, styles.thumb]}
                     contentFit="cover"
@@ -80,13 +80,13 @@ function AttachmentThumbnail({
                         style={[styles.fileName, { color: theme.colors.textSecondary }]}
                         numberOfLines={2}
                     >
-                        {image.name}
+                        {attachment.name}
                     </Text>
                 </View>
             )}
             {/* Remove button */}
             <Pressable
-                onPress={() => onRemove(image.id)}
+                onPress={() => onRemove(attachment.id)}
                 hitSlop={4}
                 style={(p) => [
                     styles.removeButton,

@@ -198,3 +198,56 @@ Validation results:
   - `pnpm --filter @slopus/happy-wire build`: pass.
   - `pnpm --filter happy-app typecheck`: pass.
   - Focused attachment tests: pass, 3 files / 55 tests.
+
+## 2026-07-04 - P0 Session Input Attachment Picker UI
+
+Implementation:
+
+- Verified the Session composer wires the attachment state into `ChatComposer`/`AgentInput`.
+- Verified the input area exposes separate image and file picker actions when `expImageUpload` is enabled.
+- Verified selected images/files render in the pending attachment preview strip before send.
+- Verified image picker assets preserve dimensions, MIME type, and thumbhash metadata while document picker assets normalize to generic file attachments.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/hooks/useImagePicker.test.ts sources/utils/pasteImages.web.test.ts sources/sync/typesRaw.spec.ts sources/sync/attachmentSupport.test.ts`
+  - 4 files / 71 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 56 files / 699 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-04 - AI Review Follow-up: Session Input Attachment Picker UI
+
+Implementation:
+
+- Replaced image-only prop/state names at the Session composer boundary with generic attachment names:
+  - `useImagePicker` now exposes `selectedAttachments`, `removeAttachment`, `clearAttachments`, and `addAttachments`;
+  - `SessionView` passes pending attachments into `ChatComposer`/`AgentInput`;
+  - `AgentInput` web paste/drop funnels into `onAddAttachments`;
+  - `AgentInputAttachmentStrip` receives `attachments` and renders image thumbnails or generic file tiles.
+- Added `resolveAgentInputSendGlyph` coverage so attachment-only messages keep the send-arrow state when voice input is available.
+- Added pending attachment strip tests for image thumbnail rendering, generic file tile rendering, thumbhash placeholder wiring, and remove-by-id behavior.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/components/AgentInputSendState.test.ts sources/components/AgentInputAttachmentStrip.test.ts sources/hooks/useImagePicker.test.ts sources/utils/pasteImages.web.test.ts sources/sync/typesRaw.spec.ts sources/sync/attachmentSupport.test.ts`
+  - 6 files / 76 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 58 files / 704 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.

@@ -20,19 +20,19 @@ import { generateThumbhash } from '@/utils/thumbhash';
 import { t } from '@/text';
 import type { AttachmentPreview } from '@/sync/attachmentTypes';
 
-export const MAX_IMAGES_PER_MESSAGE = 20;
+export const MAX_ATTACHMENTS_PER_MESSAGE = 20;
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const IOS_ATTACHMENT_JPEG_QUALITY = 0.92;
 
 export type { AttachmentPreview };
 
 type UseImagePickerResult = {
-    selectedImages: AttachmentPreview[];
+    selectedAttachments: AttachmentPreview[];
     pickImages: () => Promise<void>;
     pickFiles: () => Promise<void>;
-    removeImage: (id: string) => void;
-    clearImages: () => void;
-    addImages: (images: AttachmentPreview[]) => void;
+    removeAttachment: (id: string) => void;
+    clearAttachments: () => void;
+    addAttachments: (attachments: AttachmentPreview[]) => void;
 };
 
 function withJpegExtension(fileName: string | null | undefined): string {
@@ -87,12 +87,12 @@ export function normalizePickedDocumentForUpload(asset: DocumentPicker.DocumentP
 }
 
 export function useImagePicker(): UseImagePickerResult {
-    const [selectedImages, setSelectedImages] = useState<AttachmentPreview[]>([]);
+    const [selectedAttachments, setSelectedAttachments] = useState<AttachmentPreview[]>([]);
     // Ref tracks current count to avoid stale closures on rapid taps.
     const selectedCountRef = useRef(0);
     useEffect(() => {
-        selectedCountRef.current = selectedImages.length;
-    }, [selectedImages]);
+        selectedCountRef.current = selectedAttachments.length;
+    }, [selectedAttachments]);
 
     const requestPermission = useCallback(async (): Promise<boolean> => {
         if (Platform.OS === 'web') return true;
@@ -113,11 +113,11 @@ export function useImagePicker(): UseImagePickerResult {
         const hasPermission = await requestPermission();
         if (!hasPermission) return;
 
-        const remaining = MAX_IMAGES_PER_MESSAGE - selectedCountRef.current;
+        const remaining = MAX_ATTACHMENTS_PER_MESSAGE - selectedCountRef.current;
         if (remaining <= 0) {
             Modal.alert(
                 t('attachments.limitTitle'),
-                t('attachments.limitMessage', { max: MAX_IMAGES_PER_MESSAGE }),
+                t('attachments.limitMessage', { max: MAX_ATTACHMENTS_PER_MESSAGE }),
                 [{ text: t('common.ok') }],
             );
             return;
@@ -169,16 +169,16 @@ export function useImagePicker(): UseImagePickerResult {
         }
 
         if (previews.length > 0) {
-            setSelectedImages(prev => [...prev, ...previews].slice(0, MAX_IMAGES_PER_MESSAGE));
+            setSelectedAttachments(prev => [...prev, ...previews].slice(0, MAX_ATTACHMENTS_PER_MESSAGE));
         }
     }, [requestPermission]);
 
     const pickFiles = useCallback(async () => {
-        const remaining = MAX_IMAGES_PER_MESSAGE - selectedCountRef.current;
+        const remaining = MAX_ATTACHMENTS_PER_MESSAGE - selectedCountRef.current;
         if (remaining <= 0) {
             Modal.alert(
                 t('attachments.limitTitle'),
-                t('attachments.limitMessage', { max: MAX_IMAGES_PER_MESSAGE }),
+                t('attachments.limitMessage', { max: MAX_ATTACHMENTS_PER_MESSAGE }),
                 [{ text: t('common.ok') }],
             );
             return;
@@ -206,25 +206,25 @@ export function useImagePicker(): UseImagePickerResult {
         }
 
         if (previews.length > 0) {
-            setSelectedImages(prev => [...prev, ...previews].slice(0, MAX_IMAGES_PER_MESSAGE));
+            setSelectedAttachments(prev => [...prev, ...previews].slice(0, MAX_ATTACHMENTS_PER_MESSAGE));
         }
     }, []);
 
-    const removeImage = useCallback((id: string) => {
-        setSelectedImages(prev => prev.filter(img => img.id !== id));
+    const removeAttachment = useCallback((id: string) => {
+        setSelectedAttachments(prev => prev.filter(attachment => attachment.id !== id));
     }, []);
 
-    const clearImages = useCallback(() => {
-        setSelectedImages([]);
+    const clearAttachments = useCallback(() => {
+        setSelectedAttachments([]);
     }, []);
 
-    const addImages = useCallback((images: AttachmentPreview[]) => {
-        setSelectedImages(prev => {
-            const remaining = MAX_IMAGES_PER_MESSAGE - prev.length;
+    const addAttachments = useCallback((attachments: AttachmentPreview[]) => {
+        setSelectedAttachments(prev => {
+            const remaining = MAX_ATTACHMENTS_PER_MESSAGE - prev.length;
             if (remaining <= 0) return prev;
-            return [...prev, ...images.slice(0, remaining)];
+            return [...prev, ...attachments.slice(0, remaining)];
         });
     }, []);
 
-    return { selectedImages, pickImages, pickFiles, removeImage, clearImages, addImages };
+    return { selectedAttachments, pickImages, pickFiles, removeAttachment, clearAttachments, addAttachments };
 }

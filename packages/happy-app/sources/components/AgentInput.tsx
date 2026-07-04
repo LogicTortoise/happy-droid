@@ -16,6 +16,7 @@ import { StatusDot } from './StatusDot';
 import { useActiveWord } from './autocomplete/useActiveWord';
 import { useActiveSuggestions } from './autocomplete/useActiveSuggestions';
 import { AgentInputAutocomplete } from './AgentInputAutocomplete';
+import { resolveAgentInputSendGlyph } from './AgentInputSendState';
 import { FloatingOverlay } from './FloatingOverlay';
 import { TextInputState, MultiTextInputHandle } from './MultiTextInput';
 import { applySuggestion } from './autocomplete/applySuggestion';
@@ -87,11 +88,11 @@ interface AgentInputProps {
     minHeight?: number;
     zenMode?: boolean;
     /** Attachments waiting to be sent (expImageUpload feature). */
-    selectedImages?: AttachmentPreview[];
+    selectedAttachments?: AttachmentPreview[];
     onPickImages?: () => void;
     onPickFiles?: () => void;
-    onRemoveImage?: (id: string) => void;
-    onAddImages?: (images: AttachmentPreview[]) => void;
+    onRemoveAttachment?: (id: string) => void;
+    onAddAttachments?: (attachments: AttachmentPreview[]) => void;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -554,7 +555,15 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // updated via startTransition from the keystroke handler so a busy reducer
     // never blocks the next character from landing in the textarea.
     const [hasText, setHasText] = React.useState(() => props.initialValue.trim().length > 0);
-    const hasAttachments = (props.selectedImages?.length ?? 0) > 0;
+    const hasAttachments = (props.selectedAttachments?.length ?? 0) > 0;
+    const sendGlyph = resolveAgentInputSendGlyph({
+        isSending: props.isSending,
+        isSendBlocked,
+        hasText,
+        hasAttachments,
+        hasMicPress: !!props.onMicPress,
+        isMicActive: props.isMicActive,
+    });
     const canPressSendButton = !props.isSending
         && !props.isSendDisabled
         && (isSendBlocked ? (hasText || hasAttachments) : (hasText || hasAttachments || !!props.onMicPress));
@@ -615,9 +624,9 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     React.useImperativeHandle(ref, () => inputRef.current!, []);
 
     // Web paste/drag — intercept file pastes and file drops for the
-    // attachment feature. Both handlers funnel through props.onAddImages.
+    // attachment feature. Both handlers funnel through props.onAddAttachments.
     React.useEffect(() => {
-        if (Platform.OS !== 'web' || !props.onAddImages) return;
+        if (Platform.OS !== 'web' || !props.onAddAttachments) return;
 
         const handlePaste = async (e: ClipboardEvent) => {
             // Only handle pastes targeted at a focused text-editable element.
@@ -638,7 +647,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 files.map((f) => fileToAttachmentPreview(f, generateThumbhash))
             )).filter(Boolean) as Omit<AttachmentPreview, 'id'>[];
             if (previews.length) {
-                props.onAddImages!(previews.map((p) => ({
+                props.onAddAttachments!(previews.map((p) => ({
                     ...p,
                     id: `paste_${Date.now()}_${Math.random().toString(36).slice(2)}`,
                 })));
@@ -674,7 +683,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 files.map((f) => fileToAttachmentPreview(f, generateThumbhash))
             )).filter(Boolean) as Omit<AttachmentPreview, 'id'>[];
             if (previews.length) {
-                props.onAddImages!(previews.map((p) => ({
+                props.onAddAttachments!(previews.map((p) => ({
                     ...p,
                     id: `drop_${Date.now()}_${Math.random().toString(36).slice(2)}`,
                 })));
@@ -689,7 +698,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
             document.removeEventListener('dragover', handleDragOver);
             document.removeEventListener('drop', handleDrop);
         };
-    }, [props.onAddImages]);
+    }, [props.onAddAttachments]);
 
     // Autocomplete state — text + selection. Updated via startTransition so
     // typing renders the character immediately and the autocomplete pipeline
@@ -1198,10 +1207,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 <Shaker ref={sendBlockShakerRef}>
                 <View style={styles.unifiedPanel}>
                     {/* Attachment preview strip */}
-                    {props.selectedImages && props.selectedImages.length > 0 && (
+                    {props.selectedAttachments && props.selectedAttachments.length > 0 && (
                         <AgentInputAttachmentStrip
-                            images={props.selectedImages}
-                            onRemove={props.onRemoveImage ?? (() => {})}
+                            attachments={props.selectedAttachments}
+                            onRemove={props.onRemoveAttachment ?? (() => {})}
                         />
                     )}
                     {/* Input field */}
@@ -1343,7 +1352,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         <Ionicons
                                             name="image-outline"
                                             size={16}
-                                            color={(props.selectedImages?.length ?? 0) > 0
+                                            color={(props.selectedAttachments?.length ?? 0) > 0
                                                 ? theme.colors.radio.active
                                                 : theme.colors.button.secondary.tint}
                                         />
@@ -1368,7 +1377,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         <Ionicons
                                             name="attach-outline"
                                             size={16}
-                                            color={(props.selectedImages?.length ?? 0) > 0
+                                            color={(props.selectedAttachments?.length ?? 0) > 0
                                                 ? theme.colors.radio.active
                                                 : theme.colors.button.secondary.tint}
                                         />
@@ -1398,18 +1407,18 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         onPress={handleSendPress}
                                         disabled={!canPressSendButton}
                                     >
-                                        {props.isSending ? (
+                                        {sendGlyph === 'spinner' ? (
                                             <ActivityIndicator
                                                 size="small"
                                                 color={theme.colors.button.primary.tint}
                                             />
-                                        ) : isSendBlocked ? (
+                                        ) : sendGlyph === 'locked' ? (
                                             <Ionicons
                                                 name="lock-closed"
                                                 size={15}
                                                 color={theme.colors.textSecondary}
                                             />
-                                        ) : hasText || hasAttachments ? (
+                                        ) : sendGlyph === 'send' ? (
                                             <Octicons
                                                 name="arrow-up"
                                                 size={16}
@@ -1419,7 +1428,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                     { marginTop: Platform.OS === 'web' ? 2 : 0 }
                                                 ]}
                                             />
-                                        ) : props.onMicPress && !props.isMicActive ? (
+                                        ) : (
                                             <Image
                                                 source={require('@/assets/images/icon-voice-white.png')}
                                                 style={{
@@ -1427,16 +1436,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                     height: 24,
                                                 }}
                                                 tintColor={theme.colors.button.primary.tint}
-                                            />
-                                        ) : (
-                                            <Octicons
-                                                name="arrow-up"
-                                                size={16}
-                                                color={theme.colors.button.primary.tint}
-                                                style={[
-                                                    styles.sendButtonIcon,
-                                                    { marginTop: Platform.OS === 'web' ? 2 : 0 }
-                                                ]}
                                             />
                                         )}
                                     </Pressable>

@@ -496,7 +496,14 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     // Attachment state (expImageUpload feature flag still gates the existing experimental upload path)
     const expImageUpload = useSetting('expImageUpload');
-    const { selectedImages, pickImages, pickFiles, removeImage, clearImages, addImages } = useImagePicker();
+    const {
+        selectedAttachments,
+        pickImages,
+        pickFiles,
+        removeAttachment,
+        clearAttachments,
+        addAttachments,
+    } = useImagePicker();
 
     // ChatComposer owns the message state + useDraft subscription. We only
     // hold an imperative handle so handleSend can read the live text and
@@ -543,13 +550,13 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // need to re-create on every keystroke.
     const handleSend = React.useCallback(() => {
         const liveMessage = composerHandleRef.current?.getMessage() ?? '';
-        if (liveMessage.trim() || (expImageUpload && selectedImages.length > 0)) {
-            const attachments = expImageUpload ? selectedImages : undefined;
+        if (liveMessage.trim() || (expImageUpload && selectedAttachments.length > 0)) {
+            const attachments = expImageUpload ? selectedAttachments : undefined;
             composerHandleRef.current?.clearMessage();
-            if (expImageUpload) clearImages();
+            if (expImageUpload) clearAttachments();
             sync.sendMessage(sessionId, liveMessage, { source: 'chat', attachments });
         }
-    }, [sessionId, expImageUpload, selectedImages, clearImages]);
+    }, [sessionId, expImageUpload, selectedAttachments, clearAttachments]);
 
     const handleAbort = React.useCallback(() => {
         storage.getState().resetSessionAgentOverrides(sessionId);
@@ -720,11 +727,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             onAbort={isDisconnected ? undefined : handleAbort}
             showAbortButton={sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting'}
             onFileViewerPress={experiments && !isTablet ? handleFileViewerPress : undefined}
-            selectedImages={expImageUpload ? selectedImages : undefined}
+            selectedAttachments={expImageUpload ? selectedAttachments : undefined}
             onPickImages={expImageUpload ? pickImages : undefined}
             onPickFiles={expImageUpload ? pickFiles : undefined}
-            onRemoveImage={expImageUpload ? removeImage : undefined}
-            onAddImages={expImageUpload ? addImages : undefined}
+            onRemoveAttachment={expImageUpload ? removeAttachment : undefined}
+            onAddAttachments={expImageUpload ? addAttachments : undefined}
             autocompletePrefixes={AGENT_INPUT_AUTOCOMPLETE_PREFIXES}
             autocompleteSuggestions={handleAutocompleteSuggestions}
             usageData={usageData}
