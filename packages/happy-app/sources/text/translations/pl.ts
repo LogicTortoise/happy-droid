@@ -291,8 +291,16 @@ export const pl: TranslationStructure = {
 
     newSession: {
         title: 'Rozpocznij nową sesję',
+        selectMachine: 'Wybierz maszynę',
         machineOffline: 'Maszyna jest offline',
         switchMachinesHint: '• Przełącz maszynę, klikając na nią powyżej',
+        initialMessageNotReady: 'Sesja nie jest jeszcze gotowa na przyjęcie pierwszej wiadomości.',
+        initialMessageCancelEvent: 'Pierwsza wiadomość nie została wysłana. Prompt został przywrócony na ekranie nowej sesji.',
+        initialMessageTimeout: 'Upłynął limit czasu wysyłania pierwszej wiadomości. Spróbuj ponownie.',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `Sesja została utworzona, ale pierwsza wiadomość nie została potwierdzona. Prompt został przywrócony, aby można było spróbować ponownie.\n\n${message}`,
+        retryInitialMessageTitle: 'Ponowić pierwszą wiadomość?',
+        retryInitialMessageMessage: 'Poprzednia sesja została utworzona, ale jej pierwsza wiadomość nie została potwierdzona. Ponowić ją teraz?',
     },
 
     sessionHistory: {

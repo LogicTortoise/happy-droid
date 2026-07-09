@@ -49,3 +49,4 @@
 - Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
 - Planned coverage: new-session creation flow, optimistic/local session state, outbound message submission retry semantics, failure surfacing, recovery actions, focused reducer/sync tests, happy-app typecheck, quick/app validation, and Android build/e2e record attempt.
 - Added persisted pending initial-message recovery for app-created sessions, retry/discard handling, outbox commit waiting/cancelation, send failure return semantics, and focused recovery tests.
+- AI review follow-up requires stable first-message localId persistence, committed-message lookup before retry/timeout recovery, idempotent retry behavior, and i18n coverage for new recovery prompts.

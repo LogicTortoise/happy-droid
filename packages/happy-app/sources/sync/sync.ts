@@ -93,8 +93,14 @@ type OutboxMessage = {
 type SendMessageOptions = {
     displayText?: string;
     source?: MessageSentSource;
+    localId?: string;
     /** Optional attachments to send before the text message. */
     attachments?: AttachmentPreview[];
+};
+
+export type SendMessageResult = {
+    queued: boolean;
+    localId: string | null;
 };
 
 class Sync {
@@ -115,6 +121,7 @@ class Sync {
     // advanced downward by loadOlderMessages.
     private sessionOldestSeq = new Map<string, number>();
     private pendingOutbox = new Map<string, OutboxMessage[]>();
+    private committedLocalMessageIds = new Map<string, Set<string>>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
     private sessionMessageLocks = new Map<string, AsyncLock>();
@@ -517,6 +524,32 @@ class Sync {
         return (!remaining || remaining.length === 0) && !this.sendAbortControllers.has(sessionId);
     }
 
+    public hasPendingOutboxMessage(sessionId: string, localId: string): boolean {
+        const pending = this.pendingOutbox.get(sessionId);
+        return !!pending?.some((message) => message.localId === localId);
+    }
+
+    public hasSubmittedMessage(sessionId: string, localId: string): boolean {
+        if (this.hasPendingOutboxMessage(sessionId, localId)) {
+            return false;
+        }
+        if (this.committedLocalMessageIds.get(sessionId)?.has(localId)) {
+            return true;
+        }
+        const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
+        return messages.some((message) => (
+            'localId' in message
+            && message.localId === localId
+            && message.id !== localId
+        ));
+    }
+
+    public async refreshSessionMessages(sessionId: string): Promise<void> {
+        const sync = this.getMessagesSync(sessionId);
+        sync.invalidate();
+        await sync.awaitQueue();
+    }
+
     public cancelPendingOutboxForSession(sessionId: string, reasonText: string) {
         const controller = this.sendAbortControllers.get(sessionId);
         if (controller) {
@@ -618,7 +651,13 @@ class Sync {
         return { uploaded, failed };
     }
 
-    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions): Promise<boolean> {
+    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions): Promise<SendMessageResult> {
+        const requestedLocalId = options?.localId?.trim();
+        if (requestedLocalId) {
+            if (this.hasPendingOutboxMessage(sessionId, requestedLocalId) || this.hasSubmittedMessage(sessionId, requestedLocalId)) {
+                return { queued: true, localId: requestedLocalId };
+            }
+        }
 
         // Get encryption — may not be ready yet if sessions are still syncing
         let encryption = this.encryption.getSessionEncryption(sessionId);
@@ -628,7 +667,7 @@ class Sync {
             encryption = this.encryption.getSessionEncryption(sessionId);
             if (!encryption) {
                 console.error(`Session ${sessionId} not found after sync`);
-                return false;
+                return { queued: false, localId: requestedLocalId ?? null };
             }
         }
 
@@ -639,7 +678,7 @@ class Sync {
             session = storage.getState().sessions[sessionId];
             if (!session) {
                 console.error(`Session ${sessionId} not found in storage after sync`);
-                return false;
+                return { queued: false, localId: requestedLocalId ?? null };
             }
         }
 
@@ -661,7 +700,7 @@ class Sync {
                 [{ text: t('common.ok'), style: 'cancel' }],
             );
             if (!attachmentPlan.shouldSendText) {
-                return false;
+                return { queued: false, localId: requestedLocalId ?? null };
             }
         }
 
@@ -730,7 +769,7 @@ class Sync {
         }
 
         // Generate local ID
-        const localId = randomUUID();
+        const localId = requestedLocalId || randomUUID();
 
         // Determine sentFrom based on platform
         let sentFrom: string;
@@ -787,7 +826,7 @@ class Sync {
 
         this.getSendSync(sessionId).invalidate();
         this.maybeStartBackgroundSendWatchdog();
-        return true;
+        return { queued: true, localId };
     }
 
     /** Server sent us settings — merge any pending local changes on top, then apply as one update. */
@@ -1886,9 +1925,17 @@ class Sync {
             const data = await response.json() as V3PostSessionMessagesResponse;
             pending.splice(0, batch.length);
             if (Array.isArray(data.messages) && data.messages.length > 0) {
+                let committed = this.committedLocalMessageIds.get(sessionId);
+                if (!committed) {
+                    committed = new Set();
+                    this.committedLocalMessageIds.set(sessionId, committed);
+                }
                 const currentLastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
                 let maxSeq = currentLastSeq;
                 for (const message of data.messages) {
+                    if (message.localId) {
+                        committed.add(message.localId);
+                    }
                     if (message.seq > maxSeq) {
                         maxSeq = message.seq;
                     }

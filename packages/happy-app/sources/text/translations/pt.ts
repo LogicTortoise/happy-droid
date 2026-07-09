@@ -273,8 +273,16 @@ export const pt: TranslationStructure = {
 
     newSession: {
         title: 'Iniciar nova sessão',
+        selectMachine: 'Selecione uma máquina',
         machineOffline: 'A máquina está offline',
         switchMachinesHint: '• Troque de máquina clicando na máquina acima',
+        initialMessageNotReady: 'A sessão ainda não está pronta para receber a primeira mensagem.',
+        initialMessageCancelEvent: 'A primeira mensagem não foi enviada. O prompt foi restaurado na tela de nova sessão.',
+        initialMessageTimeout: 'Tempo esgotado ao enviar a primeira mensagem. Tente novamente.',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `A sessão foi criada, mas a primeira mensagem não foi confirmada. O prompt foi restaurado para que você possa tentar novamente.\n\n${message}`,
+        retryInitialMessageTitle: 'Tentar novamente a primeira mensagem?',
+        retryInitialMessageMessage: 'Uma sessão anterior foi criada, mas sua primeira mensagem não foi confirmada. Tentar essa mensagem agora?',
     },
 
     sessionHistory: {

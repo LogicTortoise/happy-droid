@@ -1,6 +1,8 @@
 export type PendingNewSessionSubmission = {
     sessionId: string;
     prompt: string;
+    localId: string;
+    status: 'pending' | 'failed';
     createdAt: number;
     lastError?: string;
 };
@@ -12,17 +14,20 @@ export type NewSessionSubmissionPlan =
 export function createPendingNewSessionSubmission(
     sessionId: string,
     prompt: string,
-    options?: { now?: number; lastError?: string },
+    options: { localId: string; now?: number; lastError?: string; status?: PendingNewSessionSubmission['status'] },
 ): PendingNewSessionSubmission | null {
     const trimmedSessionId = sessionId.trim();
     const trimmedPrompt = prompt.trim();
-    if (!trimmedSessionId || !trimmedPrompt) {
+    const trimmedLocalId = options.localId.trim();
+    if (!trimmedSessionId || !trimmedPrompt || !trimmedLocalId) {
         return null;
     }
 
     return {
         sessionId: trimmedSessionId,
         prompt: trimmedPrompt,
+        localId: trimmedLocalId,
+        status: options.status ?? (options.lastError ? 'failed' : 'pending'),
         createdAt: options?.now ?? Date.now(),
         ...(options?.lastError ? { lastError: options.lastError } : {}),
     };
@@ -35,16 +40,25 @@ export function normalizePendingNewSessionSubmission(value: unknown): PendingNew
     const candidate = value as {
         sessionId?: unknown;
         prompt?: unknown;
+        localId?: unknown;
+        status?: unknown;
         createdAt?: unknown;
         lastError?: unknown;
     };
-    if (typeof candidate.sessionId !== 'string' || typeof candidate.prompt !== 'string') {
+    if (
+        typeof candidate.sessionId !== 'string'
+        || typeof candidate.prompt !== 'string'
+        || typeof candidate.localId !== 'string'
+    ) {
         return null;
     }
 
+    const lastError = typeof candidate.lastError === 'string' ? candidate.lastError : undefined;
     const pending = createPendingNewSessionSubmission(candidate.sessionId, candidate.prompt, {
+        localId: candidate.localId,
         now: typeof candidate.createdAt === 'number' ? candidate.createdAt : Date.now(),
-        lastError: typeof candidate.lastError === 'string' ? candidate.lastError : undefined,
+        lastError,
+        status: candidate.status === 'failed' || lastError ? 'failed' : 'pending',
     });
     return pending;
 }
@@ -60,7 +74,7 @@ export function resolveNewSessionSubmissionPlan(input: {
         return {
             type: 'retry-pending',
             sessionId: pending.sessionId,
-            prompt: currentPrompt || pending.prompt,
+            prompt: pending.prompt,
         };
     }
 

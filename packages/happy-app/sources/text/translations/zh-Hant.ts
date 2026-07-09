@@ -274,8 +274,16 @@ export const zhHant: TranslationStructure = {
 
     newSession: {
         title: '開始新工作階段',
+        selectMachine: '請選擇裝置',
         machineOffline: '裝置離線',
         switchMachinesHint: '• 點擊上方的裝置來切換裝置',
+        initialMessageNotReady: '工作階段暫時還不能接收第一則訊息。',
+        initialMessageCancelEvent: '第一則訊息未送出。提示詞已還原到新增工作階段畫面。',
+        initialMessageTimeout: '傳送第一則訊息逾時。請重試。',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `工作階段已建立，但第一則訊息尚未確認提交。提示詞已還原，你可以重試。\n\n${message}`,
+        retryInitialMessageTitle: '重試第一則訊息？',
+        retryInitialMessageMessage: '上一個工作階段已建立，但第一則訊息尚未確認提交。現在重試這則訊息嗎？',
     },
 
     sessionHistory: {

@@ -272,8 +272,16 @@ export const it: TranslationStructure = {
 
     newSession: {
         title: 'Avvia nuova sessione',
+        selectMachine: 'Seleziona una macchina',
         machineOffline: 'La macchina è offline',
         switchMachinesHint: '• Cambia macchina cliccando sulla macchina sopra',
+        initialMessageNotReady: 'La sessione non è ancora pronta a ricevere il primo messaggio.',
+        initialMessageCancelEvent: 'Il primo messaggio non è stato inviato. Il prompt è stato ripristinato nella schermata della nuova sessione.',
+        initialMessageTimeout: 'Tempo scaduto durante l’invio del primo messaggio. Riprova.',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `La sessione è stata creata, ma il primo messaggio non è stato confermato. Il prompt è stato ripristinato così puoi riprovare.\n\n${message}`,
+        retryInitialMessageTitle: 'Ritentare il primo messaggio?',
+        retryInitialMessageMessage: 'Una sessione precedente è stata creata, ma il suo primo messaggio non è stato confermato. Vuoi riprovare ora?',
     },
 
     sessionHistory: {

@@ -424,6 +424,29 @@ Next action: fix the command failure above, then rerun this recorder so the repo
 
 Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
 
+## 2026-07-10 - P1 App-Created Session Submission Recovery Review Fix
+
+Scope:
+
+- Added stable first-message `localId` persistence to app-created session pending submissions.
+- Updated new-session recovery to refresh/query session messages by `localId` before retrying or after send timeout, clearing pending state when the first message is already submitted.
+- Updated `sync.sendMessage()` to accept a caller-provided `localId`, return the queued localId, and avoid enqueueing duplicate messages for the same pending/submitted localId.
+- Moved new recovery prompts and adjacent machine-selection errors into `newSession.*` translations for all supported languages.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/utils/newSessionSubmissionRecovery.test.ts`
+  - 1 file / 7 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+  - Android/E2E recorder tests: pass, 1 file / 2 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 61 files / 720 tests.
+
 ## 2026-07-10 - P1 App-Created Session Submission Recovery
 
 Implementation summary:

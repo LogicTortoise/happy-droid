@@ -30,6 +30,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Constants from 'expo-constants';
+import { randomUUID } from 'expo-crypto';
 import { useHeaderHeight } from '@/utils/responsive';
 import { t } from '@/text';
 import { useAllMachines, useLocalSetting, useSessions, useSetting, storage } from '@/sync/storage';
@@ -916,8 +917,22 @@ function NewSessionScreen() {
         setWorktreeKey,
     ]);
 
-    const submitInitialPromptForSession = React.useCallback(async (sessionId: string, prompt: string): Promise<boolean> => {
-        const pending = createPendingNewSessionSubmission(sessionId, prompt);
+    const confirmInitialPromptSubmitted = React.useCallback(async (sessionId: string, localId: string): Promise<boolean> => {
+        if (sync.hasSubmittedMessage(sessionId, localId)) {
+            return true;
+        }
+
+        try {
+            await sync.refreshSessionMessages(sessionId);
+        } catch (error) {
+            console.warn('Failed to refresh new-session first message status:', error);
+        }
+
+        return sync.hasSubmittedMessage(sessionId, localId);
+    }, []);
+
+    const submitInitialPromptForSession = React.useCallback(async (sessionId: string, prompt: string, existingLocalId?: string): Promise<boolean> => {
+        const pending = createPendingNewSessionSubmission(sessionId, prompt, { localId: existingLocalId ?? randomUUID() });
         const draftState = useNewSessionDraft.getState();
         if (!pending) {
             draftState.clearPendingSubmission();
@@ -928,35 +943,51 @@ function NewSessionScreen() {
         draftState.setPendingSubmission(pending);
         try {
             await sync.refreshSessions();
-            const queued = await sync.sendMessage(sessionId, pending.prompt, { source: 'new_session' });
-            if (!queued) {
-                throw new Error('Session is not ready to receive the first message yet.');
+            if (await confirmInitialPromptSubmitted(sessionId, pending.localId)) {
+                draftState.clearPendingSubmission();
+                draftState.setInput('');
+                return true;
+            }
+
+            const sendResult = await sync.sendMessage(sessionId, pending.prompt, {
+                source: 'new_session',
+                localId: pending.localId,
+            });
+            if (!sendResult.queued) {
+                throw new Error(t('newSession.initialMessageNotReady'));
             }
             const committed = await sync.waitForOutboxFlush(sessionId, INITIAL_MESSAGE_COMMIT_TIMEOUT_MS);
-            if (!committed) {
+            if (!committed && !(await confirmInitialPromptSubmitted(sessionId, pending.localId))) {
                 sync.cancelPendingOutboxForSession(
                     sessionId,
-                    'First message was not sent. The prompt was restored on the new session screen.',
+                    t('newSession.initialMessageCancelEvent'),
                 );
-                throw new Error('Timed out while sending the first message. Please retry.');
+                throw new Error(t('newSession.initialMessageTimeout'));
             }
             draftState.clearPendingSubmission();
             draftState.setInput('');
             return true;
         } catch (error) {
+            if (await confirmInitialPromptSubmitted(sessionId, pending.localId)) {
+                draftState.clearPendingSubmission();
+                draftState.setInput('');
+                return true;
+            }
+
             const message = describePendingSubmissionFailure(error);
             draftState.setPendingSubmission({
                 ...pending,
+                status: 'failed',
                 lastError: message,
             });
             draftState.setInput(pending.prompt);
             Modal.alert(
                 t('common.error'),
-                `Session was created, but the first message was not sent. Your prompt was restored so you can retry.\n\n${message}`,
+                t('newSession.initialMessageRecoveryMessage', { message }),
             );
             return false;
         }
-    }, []);
+    }, [confirmInitialPromptSubmitted]);
 
     // Spawn session handler
     const handleSend = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
@@ -967,38 +998,58 @@ function NewSessionScreen() {
         });
 
         if (submissionPlan.type === 'retry-pending') {
-            const shouldRetry = await Modal.confirm(
-                'Retry First Message?',
-                'A previous session was created, but its first message was not confirmed. Retry that message now?',
-                { cancelText: t('common.discard'), confirmText: t('common.retry') },
-            );
-            if (!shouldRetry) {
+            const pendingSubmission = draftState.pendingSubmission;
+            if (!pendingSubmission) {
                 draftState.clearPendingSubmission();
                 submissionPlan = {
                     type: 'spawn-new',
                     prompt: draftState.input.trim(),
                 };
-            } else {
-                setIsSpawning(true);
-                try {
-                    const submitted = await submitInitialPromptForSession(submissionPlan.sessionId, submissionPlan.prompt);
-                    if (submitted) {
-                        router.back();
-                        navigateToSession(submissionPlan.sessionId);
-                    }
-                } finally {
-                    setIsSpawning(false);
-                }
+            } else if (await confirmInitialPromptSubmitted(submissionPlan.sessionId, pendingSubmission.localId)) {
+                draftState.clearPendingSubmission();
+                draftState.setInput('');
+                router.back();
+                navigateToSession(submissionPlan.sessionId);
                 return;
+            } else {
+
+                const shouldRetry = await Modal.confirm(
+                    t('newSession.retryInitialMessageTitle'),
+                    t('newSession.retryInitialMessageMessage'),
+                    { cancelText: t('common.discard'), confirmText: t('common.retry') },
+                );
+                if (!shouldRetry) {
+                    draftState.clearPendingSubmission();
+                    submissionPlan = {
+                        type: 'spawn-new',
+                        prompt: draftState.input.trim(),
+                    };
+                } else {
+                    setIsSpawning(true);
+                    try {
+                        const submitted = await submitInitialPromptForSession(
+                            submissionPlan.sessionId,
+                            submissionPlan.prompt,
+                            pendingSubmission.localId,
+                        );
+                        if (submitted) {
+                            router.back();
+                            navigateToSession(submissionPlan.sessionId);
+                        }
+                    } finally {
+                        setIsSpawning(false);
+                    }
+                    return;
+                }
             }
         }
 
         if (!selectedMachineId || !selectedMachine) {
-            Modal.alert(t('common.error'), 'Please select a machine');
+            Modal.alert(t('common.error'), t('newSession.selectMachine'));
             return;
         }
         if (!isMachineOnline(selectedMachine)) {
-            Modal.alert(t('common.error'), 'Machine is offline');
+            Modal.alert(t('common.error'), t('newSession.machineOffline'));
             return;
         }
 

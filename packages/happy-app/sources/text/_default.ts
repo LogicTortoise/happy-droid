@@ -287,8 +287,16 @@ export const en = {
 
     newSession: {
         title: 'Start New Session',
+        selectMachine: 'Please select a machine',
         machineOffline: 'Machine is offline',
         switchMachinesHint: '• Switch machines by clicking on the machine above',
+        initialMessageNotReady: 'Session is not ready to receive the first message yet.',
+        initialMessageCancelEvent: 'First message was not sent. The prompt was restored on the new session screen.',
+        initialMessageTimeout: 'Timed out while sending the first message. Please retry.',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `Session was created, but the first message was not confirmed. Your prompt was restored so you can retry.\n\n${message}`,
+        retryInitialMessageTitle: 'Retry First Message?',
+        retryInitialMessageMessage: 'A previous session was created, but its first message was not confirmed. Retry that message now?',
     },
 
     sessionHistory: {

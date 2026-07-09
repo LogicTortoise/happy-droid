@@ -274,8 +274,16 @@ export const ca: TranslationStructure = {
 
     newSession: {
         title: 'Iniciar nova sessió',
+        selectMachine: 'Selecciona una màquina',
         machineOffline: 'La màquina està fora de línia',
         switchMachinesHint: '• Canvia de màquina fent clic a la màquina de dalt',
+        initialMessageNotReady: 'La sessió encara no està preparada per rebre el primer missatge.',
+        initialMessageCancelEvent: 'El primer missatge no s’ha enviat. La indicació s’ha restaurat a la pantalla de nova sessió.',
+        initialMessageTimeout: 'S’ha esgotat el temps enviant el primer missatge. Torna-ho a provar.',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `La sessió s’ha creat, però el primer missatge no s’ha confirmat. La indicació s’ha restaurat perquè puguis tornar-ho a provar.\n\n${message}`,
+        retryInitialMessageTitle: 'Vols reintentar el primer missatge?',
+        retryInitialMessageMessage: 'S’ha creat una sessió anterior, però el primer missatge no s’ha confirmat. Vols reintentar-lo ara?',
     },
 
     sessionHistory: {

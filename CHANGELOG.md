@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added stable localId confirmation and localized recovery prompts for app-created session first-message retries.
 - Hardened happy-app-created session first-message submission with persisted retry/discard recovery and outbox commit checks.
 - Added an Android/E2E recorder that captures validation results and APK artifact state in the happy-droid report.
 - Added image thumbnails and full-screen preview for saved agent-produced downloaded image refs in happy-app.

@@ -275,8 +275,16 @@ export const zhHans: TranslationStructure = {
 
     newSession: {
         title: '开始新会话',
+        selectMachine: '请选择设备',
         machineOffline: '设备离线',
         switchMachinesHint: '• 点击上方的设备来切换设备',
+        initialMessageNotReady: '会话暂时还不能接收第一条消息。',
+        initialMessageCancelEvent: '第一条消息未发送。提示词已恢复到新建会话页面。',
+        initialMessageTimeout: '发送第一条消息超时。请重试。',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `会话已创建，但第一条消息尚未确认提交。提示词已恢复，你可以重试。\n\n${message}`,
+        retryInitialMessageTitle: '重试第一条消息？',
+        retryInitialMessageMessage: '上一次会话已创建，但第一条消息尚未确认提交。现在重试这条消息吗？',
     },
 
     sessionHistory: {

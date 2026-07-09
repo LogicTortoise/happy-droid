@@ -260,8 +260,16 @@ export const ru: TranslationStructure = {
 
     newSession: {
         title: 'Начать новую сессию',
+        selectMachine: 'Выберите машину',
         machineOffline: 'Машина недоступна',
         switchMachinesHint: '• Переключите машину, нажав на неё выше',
+        initialMessageNotReady: 'Сессия ещё не готова принять первое сообщение.',
+        initialMessageCancelEvent: 'Первое сообщение не было отправлено. Запрос восстановлен на экране новой сессии.',
+        initialMessageTimeout: 'Истекло время отправки первого сообщения. Повторите попытку.',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `Сессия создана, но первое сообщение не подтверждено. Запрос восстановлен, чтобы вы могли повторить попытку.\n\n${message}`,
+        retryInitialMessageTitle: 'Повторить первое сообщение?',
+        retryInitialMessageMessage: 'Предыдущая сессия была создана, но её первое сообщение не подтверждено. Повторить его сейчас?',
     },
 
     sessionHistory: {

@@ -275,8 +275,16 @@ export const ja: TranslationStructure = {
 
     newSession: {
         title: '新しいセッションを開始',
+        selectMachine: 'マシンを選択してください',
         machineOffline: 'マシンがオフラインです',
         switchMachinesHint: '• 上のマシンをクリックしてマシンを切り替えてください',
+        initialMessageNotReady: 'セッションはまだ最初のメッセージを受け取る準備ができていません。',
+        initialMessageCancelEvent: '最初のメッセージは送信されませんでした。プロンプトは新規セッション画面に復元されました。',
+        initialMessageTimeout: '最初のメッセージの送信がタイムアウトしました。再試行してください。',
+        initialMessageRecoveryMessage: ({ message }: { message: string }) =>
+            `セッションは作成されましたが、最初のメッセージは確認されませんでした。再試行できるようにプロンプトを復元しました。\n\n${message}`,
+        retryInitialMessageTitle: '最初のメッセージを再試行しますか？',
+        retryInitialMessageMessage: '以前のセッションは作成されましたが、最初のメッセージが確認されていません。今すぐ再試行しますか？',
     },
 
     sessionHistory: {
