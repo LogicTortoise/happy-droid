@@ -50,3 +50,10 @@
 - Planned coverage: new-session creation flow, optimistic/local session state, outbound message submission retry semantics, failure surfacing, recovery actions, focused reducer/sync tests, happy-app typecheck, quick/app validation, and Android build/e2e record attempt.
 - Added persisted pending initial-message recovery for app-created sessions, retry/discard handling, outbox commit waiting/cancelation, send failure return semantics, and focused recovery tests.
 - AI review follow-up requires stable first-message localId persistence, committed-message lookup before retry/timeout recovery, idempotent retry behavior, and i18n coverage for new recovery prompts.
+
+## 2026-07-10 - Telegram-Aligned Custom Instructions
+
+- Started P1 work to align happy-app custom instruction sending/rendering with the read-only happy-telegram bridge behavior.
+- Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
+- Read-only reference: `/Users/Hht/Documents/10.github/happy-telegram` uses appended instructions to require button-style user questions, with Telegram rendering handled by `ask_user_question`; happy-app will align on the supported native `AskUserQuestion` path and existing app tool rendering rather than Telegram-only MCP tools.
+- Planned coverage: app append-system-prompt contents, send metadata propagation, AskUserQuestion input compatibility, focused prompt/render tests, happy-app typecheck, quick/app validation, and Android build environment record if needed.

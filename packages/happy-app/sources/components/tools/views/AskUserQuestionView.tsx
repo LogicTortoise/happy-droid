@@ -6,22 +6,7 @@ import { ToolSectionView } from '../ToolSectionView';
 import { sessionAllow } from '@/sync/ops';
 import { t } from '@/text';
 import { Ionicons } from '@expo/vector-icons';
-
-interface QuestionOption {
-    label: string;
-    description: string;
-}
-
-interface Question {
-    question: string;
-    header: string;
-    options: QuestionOption[];
-    multiSelect: boolean;
-}
-
-interface AskUserQuestionInput {
-    questions: Question[];
-}
+import { normalizeAskUserQuestions } from './askUserQuestionInput';
 
 // Styles MUST be defined outside the component to prevent infinite re-renders
 // with react-native-unistyles. The theme is passed as a function parameter.
@@ -170,11 +155,9 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [isSubmitted, setIsSubmitted] = React.useState(false);
 
-    // Parse input
-    const input = tool.input as AskUserQuestionInput | undefined;
-    const questions = input?.questions;
+    const questions = React.useMemo(() => normalizeAskUserQuestions(tool.input), [tool.input]);
 
-    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    if (questions.length === 0) {
         return null;
     }
 
@@ -263,7 +246,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
                             : '-';
                         return (
                             <View key={qIndex} style={styles.submittedItem}>
-                                <Text style={styles.submittedHeader}>{q.header}:</Text>
+                                <Text style={styles.submittedHeader}>{q.header || q.question}:</Text>
                                 <Text style={styles.submittedValue}>{selectedLabels}</Text>
                             </View>
                         );
@@ -281,9 +264,11 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
 
                     return (
                         <View key={qIndex} style={styles.questionSection}>
-                            <View style={styles.headerChip}>
-                                <Text style={styles.headerText}>{question.header}</Text>
-                            </View>
+                            {question.header && (
+                                <View style={styles.headerChip}>
+                                    <Text style={styles.headerText}>{question.header}</Text>
+                                </View>
+                            )}
                             <Text style={styles.questionText}>{question.question}</Text>
                             <View style={styles.optionsContainer}>
                                 {question.options.map((option, oIndex) => {

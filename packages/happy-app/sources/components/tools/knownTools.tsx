@@ -899,12 +899,12 @@ export const knownTools = {
         input: z.object({
             questions: z.array(z.object({
                 question: z.string().describe('The question to ask'),
-                header: z.string().describe('Short label for the question'),
+                header: z.string().optional().describe('Short label for the question'),
                 options: z.array(z.object({
                     label: z.string().describe('Option label'),
-                    description: z.string().describe('Option description')
+                    description: z.string().optional().describe('Option description')
                 })).describe('Available choices'),
-                multiSelect: z.boolean().describe('Allow multiple selections')
+                multiSelect: z.boolean().optional().describe('Allow multiple selections')
             })).describe('Questions to ask the user')
         }).partial().passthrough(),
         extractSubtitle: (opts: { metadata: Metadata | null, tool: ToolCall }) => {

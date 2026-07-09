@@ -424,6 +424,31 @@ Next action: fix the command failure above, then rerun this recorder so the repo
 
 Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
 
+## 2026-07-10 - P1 Telegram-Aligned Custom Instructions
+
+Scope:
+
+- Read `/Users/Hht/Documents/10.github/happy-telegram` as a read-only reference for the bridge's button-style custom instructions.
+- Updated happy-app's appended system prompt to prefer native `AskUserQuestion` button prompts while retaining the existing XML `<options>` fallback.
+- Updated the app `AskUserQuestion` renderer/schema path to accept Telegram-compatible optional `header`, `description`, and `multiSelect` fields and filter malformed choices before rendering.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/prompt/systemPrompt.test.ts sources/components/tools/views/AskUserQuestionView.test.ts`
+  - 2 files / 5 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+  - Android/E2E recorder tests: pass, 1 file / 2 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 63 files / 725 tests.
+- FAIL: `node scripts/happy-droid-e2e-record.cjs --run --groups android --title "P1 Telegram-Aligned Custom Instructions Android Build Record"`
+  - Android debug/release Gradle commands failed because the current host Java is 8 and Gradle requires JVM 17 or later.
+  - No Java, Android SDK, proxy, VPN, Tailscale, or host network settings were changed.
+
 ## 2026-07-10 - P1 App-Created Session Submission Recovery Review Fix
 
 Scope:
@@ -508,6 +533,70 @@ Gradle requires JVM 17 or later to run. Your build is currently configured to us
 
 - FAIL: `./gradlew :app:assembleRelease`
   - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 440ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 473542106 bytes
+  - mtime: 2026-07-03T11:36:10.183Z
+- release: missing at `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk`
+
+Overall result: FAIL (android-debug-apk, android-release-apk)
+
+Next action: fix the command failure above, then rerun this recorder so the report contains the updated command and APK artifact state.
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 07:16 - P1 Telegram-Aligned Custom Instructions Android Build Record
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-09T23:16:52.806Z
+- Finished: 2026-07-09T23:16:54.370Z
+
+Command results:
+
+- FAIL: `./gradlew :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 434ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+- FAIL: `./gradlew :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 427ms
   - exit: 1
   - failure tail:
 
