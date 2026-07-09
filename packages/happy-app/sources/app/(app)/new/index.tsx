@@ -59,6 +59,11 @@ import { isRunningOnMac } from '@/utils/platform';
 import { getNewSessionSidebarLayout } from '@/utils/newSessionSidebarLayout';
 import { getAgentPickerItems, getModePickerItems } from '@/utils/newSessionPickerItems';
 import { resolveAgentDefaultConfig } from '@/sync/agentDefaults';
+import {
+    createPendingNewSessionSubmission,
+    describePendingSubmissionFailure,
+    resolveNewSessionSubmissionPlan,
+} from '@/utils/newSessionSubmissionRecovery';
 
 // Agent icon assets
 const agentIcons = {
@@ -88,6 +93,7 @@ const COMPOSER_INPUT_VERTICAL_PADDING = Platform.OS === 'web' ? 10 : 8;
 const COMPOSER_INPUT_MAX_HEIGHT = Platform.OS === 'web' ? 480 : 240;
 const COMPOSER_SEND_BUTTON_SIZE = 32;
 const WORKTREE_PATH_DEBOUNCE_MS = 300;
+const INITIAL_MESSAGE_COMMIT_TIMEOUT_MS = 10_000;
 
 function trimPathInput(path: string | null | undefined): string {
     return path?.trim() ?? '';
@@ -578,6 +584,9 @@ function NewSessionScreen() {
         setSessionType: s.setSessionType,
         worktreeKey: s.worktreeKey,
         setWorktreeKey: s.setWorktreeKey,
+        pendingSubmission: s.pendingSubmission,
+        setPendingSubmission: s.setPendingSubmission,
+        clearPendingSubmission: s.clearPendingSubmission,
     })));
     const hasText = useNewSessionDraft((s) => s.input.trim().length > 0);
     const selectedAgent = draft.agentType;
@@ -809,6 +818,7 @@ function NewSessionScreen() {
     const currentPermission = permissionModes[permissionIndex] ?? permissionModes[0];
     const currentEffort = effortLevels[effortIndex] ?? effortLevels[0];
     const permissionStyle = currentPermission?.key !== 'default' ? getPermissionStyle(currentPermission.key) : null;
+    const hasPendingSubmission = draft.pendingSubmission !== null;
 
     // Display values
     const machineName = selectedMachine ? getMachineName(selectedMachine) : 'Select machine';
@@ -906,8 +916,83 @@ function NewSessionScreen() {
         setWorktreeKey,
     ]);
 
+    const submitInitialPromptForSession = React.useCallback(async (sessionId: string, prompt: string): Promise<boolean> => {
+        const pending = createPendingNewSessionSubmission(sessionId, prompt);
+        const draftState = useNewSessionDraft.getState();
+        if (!pending) {
+            draftState.clearPendingSubmission();
+            draftState.setInput('');
+            return true;
+        }
+
+        draftState.setPendingSubmission(pending);
+        try {
+            await sync.refreshSessions();
+            const queued = await sync.sendMessage(sessionId, pending.prompt, { source: 'new_session' });
+            if (!queued) {
+                throw new Error('Session is not ready to receive the first message yet.');
+            }
+            const committed = await sync.waitForOutboxFlush(sessionId, INITIAL_MESSAGE_COMMIT_TIMEOUT_MS);
+            if (!committed) {
+                sync.cancelPendingOutboxForSession(
+                    sessionId,
+                    'First message was not sent. The prompt was restored on the new session screen.',
+                );
+                throw new Error('Timed out while sending the first message. Please retry.');
+            }
+            draftState.clearPendingSubmission();
+            draftState.setInput('');
+            return true;
+        } catch (error) {
+            const message = describePendingSubmissionFailure(error);
+            draftState.setPendingSubmission({
+                ...pending,
+                lastError: message,
+            });
+            draftState.setInput(pending.prompt);
+            Modal.alert(
+                t('common.error'),
+                `Session was created, but the first message was not sent. Your prompt was restored so you can retry.\n\n${message}`,
+            );
+            return false;
+        }
+    }, []);
+
     // Spawn session handler
     const handleSend = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
+        const draftState = useNewSessionDraft.getState();
+        let submissionPlan = resolveNewSessionSubmissionPlan({
+            pendingSubmission: draftState.pendingSubmission,
+            currentInput: draftState.input,
+        });
+
+        if (submissionPlan.type === 'retry-pending') {
+            const shouldRetry = await Modal.confirm(
+                'Retry First Message?',
+                'A previous session was created, but its first message was not confirmed. Retry that message now?',
+                { cancelText: t('common.discard'), confirmText: t('common.retry') },
+            );
+            if (!shouldRetry) {
+                draftState.clearPendingSubmission();
+                submissionPlan = {
+                    type: 'spawn-new',
+                    prompt: draftState.input.trim(),
+                };
+            } else {
+                setIsSpawning(true);
+                try {
+                    const submitted = await submitInitialPromptForSession(submissionPlan.sessionId, submissionPlan.prompt);
+                    if (submitted) {
+                        router.back();
+                        navigateToSession(submissionPlan.sessionId);
+                    }
+                } finally {
+                    setIsSpawning(false);
+                }
+                return;
+            }
+        }
+
         if (!selectedMachineId || !selectedMachine) {
             Modal.alert(t('common.error'), 'Please select a machine');
             return;
@@ -963,16 +1048,9 @@ function NewSessionScreen() {
                     storage.getState().updateSessionModelMode(result.sessionId, modelOverride);
                     storage.getState().updateSessionEffortLevel(result.sessionId, effortOverride);
 
-                    // Pull live prompt and clear it. We read via getState() so this
-                    // callback doesn't have to subscribe to `input` (which would
-                    // re-render the screen on every keystroke).
-                    const draftState = useNewSessionDraft.getState();
-                    const trimmedPrompt = draftState.input.trim();
-                    draftState.setInput('');
-
-                    // Send initial message if provided
-                    if (trimmedPrompt) {
-                        await sync.sendMessage(result.sessionId, trimmedPrompt, { source: 'new_session' });
+                    const submitted = await submitInitialPromptForSession(result.sessionId, submissionPlan.prompt);
+                    if (!submitted) {
+                        return;
                     }
 
                     router.back();
@@ -1001,9 +1079,10 @@ function NewSessionScreen() {
         } finally {
             setIsSpawning(false);
         }
-    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.effortLevel, worktreeKey]);
+    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.effortLevel, worktreeKey, submitInitialPromptForSession]);
 
-    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
+    const canSpawnNewSession = Boolean(selectedMachineId && selectedMachine && isMachineOnline(selectedMachine));
+    const canSend = !isSpawning && (hasPendingSubmission || canSpawnNewSession);
     const sidebarLayout = getNewSessionSidebarLayout({
         platform: Platform.OS,
         isMac: isRunningOnMac(),

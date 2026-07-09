@@ -498,6 +498,58 @@ class Sync {
         this.backgroundSendStartedAt = null;
     }
 
+    public async waitForOutboxFlush(sessionId: string, timeoutMs: number): Promise<boolean> {
+        const pending = this.pendingOutbox.get(sessionId);
+        if ((!pending || pending.length === 0) && !this.sendAbortControllers.has(sessionId)) {
+            return true;
+        }
+
+        const completed = await Promise.race([
+            this.getSendSync(sessionId).awaitQueue().then(() => true),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
+        ]);
+
+        if (!completed) {
+            return false;
+        }
+
+        const remaining = this.pendingOutbox.get(sessionId);
+        return (!remaining || remaining.length === 0) && !this.sendAbortControllers.has(sessionId);
+    }
+
+    public cancelPendingOutboxForSession(sessionId: string, reasonText: string) {
+        const controller = this.sendAbortControllers.get(sessionId);
+        if (controller) {
+            controller.abort();
+            this.sendAbortControllers.delete(sessionId);
+        }
+
+        const pending = this.pendingOutbox.get(sessionId);
+        if (!pending || pending.length === 0) {
+            return;
+        }
+
+        pending.length = 0;
+        this.pendingOutbox.delete(sessionId);
+        this.enqueueMessages(sessionId, [{
+            id: randomUUID(),
+            localId: null,
+            createdAt: Date.now(),
+            role: 'event',
+            isSidechain: false,
+            content: {
+                type: 'message',
+                message: reasonText,
+            },
+        }]);
+
+        if (!this.hasPendingOutboxMessages()) {
+            this.clearBackgroundSendWatchdog();
+            void this.cancelBackgroundSendTimeoutNotification();
+            this.backgroundSendStartedAt = null;
+        }
+    }
+
     /**
      * Upload attachments for a session: read bytes → encrypt → upload to server.
      * Returns UploadedAttachment records to embed as file events before the text message.
@@ -566,7 +618,7 @@ class Sync {
         return { uploaded, failed };
     }
 
-    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions) {
+    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions): Promise<boolean> {
 
         // Get encryption — may not be ready yet if sessions are still syncing
         let encryption = this.encryption.getSessionEncryption(sessionId);
@@ -576,7 +628,7 @@ class Sync {
             encryption = this.encryption.getSessionEncryption(sessionId);
             if (!encryption) {
                 console.error(`Session ${sessionId} not found after sync`);
-                return;
+                return false;
             }
         }
 
@@ -587,7 +639,7 @@ class Sync {
             session = storage.getState().sessions[sessionId];
             if (!session) {
                 console.error(`Session ${sessionId} not found in storage after sync`);
-                return;
+                return false;
             }
         }
 
@@ -609,7 +661,7 @@ class Sync {
                 [{ text: t('common.ok'), style: 'cancel' }],
             );
             if (!attachmentPlan.shouldSendText) {
-                return;
+                return false;
             }
         }
 
@@ -735,6 +787,7 @@ class Sync {
 
         this.getSendSync(sessionId).invalidate();
         this.maybeStartBackgroundSendWatchdog();
+        return true;
     }
 
     /** Server sent us settings — merge any pending local changes on top, then apply as one update. */

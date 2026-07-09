@@ -424,12 +424,22 @@ Next action: fix the command failure above, then rerun this recorder so the repo
 
 Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
 
-Post-recorder validation:
+## 2026-07-10 - P1 App-Created Session Submission Recovery
 
-- PASS: `node --test scripts/happy-droid-e2e-record.test.cjs`
-  - 1 file / 2 tests.
-- PASS: `node scripts/happy-droid-validate.cjs --list`
-  - Confirmed quick group includes `android-e2e-record-tests`.
+Implementation summary:
+
+- Added persisted `pendingSubmission` state to the new-session draft so a spawned session plus unsent first prompt survives navigation/app restart.
+- New-session send now asks to retry an existing pending session before spawning another session, with a discard path for intentionally starting over.
+- New-session send registers a pending first prompt before submission, waits for the session outbox to flush, clears recovery state only after commit, and restores the prompt on failure.
+- Added `sync.sendMessage()` boolean success semantics for missing session/encryption readiness.
+- Added `sync.waitForOutboxFlush()` and `sync.cancelPendingOutboxForSession()` so failed first-message attempts do not continue in the background and duplicate a later retry.
+- Added focused recovery tests for pending submission normalization and retry-vs-spawn planning.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/utils/newSessionSubmissionRecovery.test.ts sources/utils/newSessionPickerItems.test.ts sources/utils/newSessionSidebarLayout.test.ts`
+  - 3 files / 12 tests.
+- PASS: `pnpm --filter happy-app typecheck`
 - PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
   - `pnpm install --frozen-lockfile`: pass.
   - `pnpm --filter @slopus/happy-wire build`: pass.
@@ -437,4 +447,68 @@ Post-recorder validation:
   - Focused attachment tests: pass, 3 files / 55 tests.
   - Android/E2E recorder tests: pass, 1 file / 2 tests.
 - PASS: `node scripts/happy-droid-validate.cjs --run --group app`
-  - Full app Vitest suite passed, 60 files / 713 tests.
+  - Full app Vitest suite passed, 61 files / 718 tests.
+
+
+## 2026-07-10 02:26 - P1 App-Created Session Submission Recovery Android Build Record
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-09T18:26:14.259Z
+- Finished: 2026-07-09T18:26:15.883Z
+
+Command results:
+
+- FAIL: `./gradlew :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 447ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+- FAIL: `./gradlew :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 440ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 473542106 bytes
+  - mtime: 2026-07-03T11:36:10.183Z
+- release: missing at `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk`
+
+Overall result: FAIL (android-debug-apk, android-release-apk)
+
+Next action: fix the command failure above, then rerun this recorder so the report contains the updated command and APK artifact state.
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.

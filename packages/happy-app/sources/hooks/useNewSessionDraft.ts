@@ -12,6 +12,7 @@ import {
     type NewSessionSessionType,
 } from '@/sync/persistence';
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
+import type { PendingNewSessionSubmission } from '@/utils/newSessionSubmissionRecovery';
 
 interface NewSessionDraftState {
     input: string;
@@ -22,6 +23,7 @@ interface NewSessionDraftState {
     modelMode: string;
     sessionType: NewSessionSessionType;
     worktreeKey: string | null;
+    pendingSubmission: PendingNewSessionSubmission | null;
 
     setInput: (input: string) => void;
     setMachineId: (id: string | null) => void;
@@ -31,6 +33,8 @@ interface NewSessionDraftState {
     setModelMode: (mode: string) => void;
     setSessionType: (type: NewSessionSessionType) => void;
     setWorktreeKey: (key: string | null) => void;
+    setPendingSubmission: (submission: PendingNewSessionSubmission | null) => void;
+    clearPendingSubmission: () => void;
 }
 
 function persist(state: NewSessionDraftState) {
@@ -43,6 +47,7 @@ function persist(state: NewSessionDraftState) {
         modelMode: state.modelMode,
         sessionType: state.sessionType,
         worktreeKey: state.worktreeKey,
+        pendingSubmission: state.pendingSubmission,
         updatedAt: Date.now(),
     });
 }
@@ -58,6 +63,7 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     modelMode: initial?.modelMode ?? 'default',
     sessionType: initial?.sessionType ?? 'simple',
     worktreeKey: initial?.worktreeKey ?? null,
+    pendingSubmission: initial?.pendingSubmission ?? null,
 
     setInput: (input) => { set({ input }); persist(get()); },
     setMachineId: (id) => { set({ selectedMachineId: id, selectedPath: null, worktreeKey: null }); persist(get()); },
@@ -67,4 +73,6 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     setModelMode: (mode) => { set({ modelMode: mode }); persist(get()); },
     setSessionType: (type) => { set({ sessionType: type }); persist(get()); },
     setWorktreeKey: (key) => { set({ worktreeKey: key }); persist(get()); },
+    setPendingSubmission: (submission) => { set({ pendingSubmission: submission }); persist(get()); },
+    clearPendingSubmission: () => { set({ pendingSubmission: null }); persist(get()); },
 }));

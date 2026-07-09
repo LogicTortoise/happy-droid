@@ -42,3 +42,10 @@
 - Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
 - Planned coverage: reusable Android/E2E record command, Java/Gradle environment capture, quick/app/android command result capture, APK artifact metadata recording, report append behavior, focused script tests, typecheck, quick/app validation, and Android build attempt.
 - Added `scripts/happy-droid-e2e-record.cjs`, dry-run tests, validation-helper integration, and validation docs so Android build attempts append command outcomes plus APK artifact state to `docs/happy-droid/e2e-report.md`.
+
+## 2026-07-10 - App-Created Session Submission Recovery
+
+- Started P1 work to harden happy-app-created session submission and failure recovery.
+- Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
+- Planned coverage: new-session creation flow, optimistic/local session state, outbound message submission retry semantics, failure surfacing, recovery actions, focused reducer/sync tests, happy-app typecheck, quick/app validation, and Android build/e2e record attempt.
+- Added persisted pending initial-message recovery for app-created sessions, retry/discard handling, outbox commit waiting/cancelation, send failure return semantics, and focused recovery tests.
