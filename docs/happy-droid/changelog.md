@@ -35,3 +35,10 @@
 - Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
 - Planned coverage: image MIME detection, saved image thumbnail rendering, full-screen preview open/close, non-image fallback row behavior, component integration tests, happy-app typecheck, quick/app validation, and Android APK environment check.
 - Implemented saved image detection for downloaded agent refs, thumbnail rendering, full-screen preview open/close, and component integration coverage while preserving non-image save rows.
+
+## 2026-07-10 - Android Build and E2E Record Loop
+
+- Started P0 work to close the Android build and end-to-end validation record loop.
+- Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
+- Planned coverage: reusable Android/E2E record command, Java/Gradle environment capture, quick/app/android command result capture, APK artifact metadata recording, report append behavior, focused script tests, typecheck, quick/app validation, and Android build attempt.
+- Added `scripts/happy-droid-e2e-record.cjs`, dry-run tests, validation-helper integration, and validation docs so Android build attempts append command outcomes plus APK artifact state to `docs/happy-droid/e2e-report.md`.

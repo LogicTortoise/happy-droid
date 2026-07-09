@@ -16,6 +16,16 @@ node scripts/happy-droid-validate.cjs --run --group all
 
 Default behavior is `--list`. Commands are intentionally explicit so the list can be reviewed before long Android builds run.
 
+The checkout also has an Android/E2E report recorder:
+
+```bash
+node scripts/happy-droid-e2e-record.cjs --list
+node scripts/happy-droid-e2e-record.cjs --dry-run --only android-debug-apk
+node scripts/happy-droid-e2e-record.cjs --run --groups quick,app,android
+```
+
+The recorder appends a Markdown section to `docs/happy-droid/e2e-report.md` with command results, Java/Gradle environment probes, APK artifact state, and APK SHA-256 only when an artifact was produced by the current run.
+
 ## Quick Baseline
 
 These commands validate the pnpm install, shared wire build, app typecheck, and focused attachment tests:
@@ -25,6 +35,7 @@ pnpm install --frozen-lockfile
 pnpm --filter @slopus/happy-wire build
 pnpm --filter happy-app typecheck
 pnpm --filter happy-app exec vitest run sources/sync/attachmentSupport.test.ts sources/sync/attachmentDiagnostics.test.ts sources/sync/apiAttachments.test.ts
+node --test scripts/happy-droid-e2e-record.test.cjs
 ```
 
 ## App Test Baseline
@@ -107,3 +118,5 @@ Minimum fields:
 - result
 - artifact path, if an APK or exported bundle was produced
 - failure reason and next action, if any
+
+The recorder fills these fields automatically for selected validation commands and marks pre-existing APK files separately from APKs produced by the current run.

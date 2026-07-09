@@ -45,6 +45,14 @@ const commands = [
     description: 'Run focused attachment upload/download support tests.',
   },
   {
+    id: 'android-e2e-record-tests',
+    group: 'quick',
+    cwd: '.',
+    command: 'node',
+    args: ['--test', 'scripts/happy-droid-e2e-record.test.cjs'],
+    description: 'Run focused tests for the Android/E2E report recorder.',
+  },
+  {
     id: 'app-tests',
     group: 'app',
     cwd: '.',

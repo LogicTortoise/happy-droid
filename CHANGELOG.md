@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added an Android/E2E recorder that captures validation results and APK artifact state in the happy-droid report.
 - Added image thumbnails and full-screen preview for saved agent-produced downloaded image refs in happy-app.
 - Added happy-app parsing, UI save actions, and local persistence for agent-produced artifact/file refs.
 - Wired the happy-app Session input to generic pending attachments with separate image/file picker actions and preview-strip tests.
