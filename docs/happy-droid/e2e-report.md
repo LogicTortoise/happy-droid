@@ -251,3 +251,75 @@ Validation results:
 - FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
   - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
   - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-04 - P0 Agent Artifact/File Reference Downloads
+
+Implementation:
+
+- Added `agentFileDownloads` core logic for app-side parsing of agent-produced file/artifact references.
+- Supported reference extraction from nested file event objects, JSON lines, `happy://file` URLs, `happy://artifact` URLs, and `artifact:<id>` text.
+- Added file-ref download orchestration through the existing encrypted attachment download path.
+- Added artifact body save support via an injected artifact body fetcher.
+- Added local save handling for app documents storage with safe filenames, markdown artifact extension handling, and collision-safe numbered filenames.
+- Kept Expo FileSystem and attachment API defaults lazy-loaded so unit tests and non-native contexts can use injected adapters without parsing native modules.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/agentFileDownloads.test.ts sources/sync/apiAttachments.test.ts sources/sync/attachmentSupport.test.ts`
+  - 3 files / 25 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 59 files / 710 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-09 - Retry: P0 Agent Artifact/File Reference Downloads
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/agentFileDownloads.test.ts sources/sync/apiAttachments.test.ts sources/sync/attachmentSupport.test.ts`
+  - 3 files / 25 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 59 files / 710 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-10 - AI Review Follow-up: Agent Ref Download Production Integration
+
+Implementation:
+
+- Added `AgentFileReferenceDownloads` to parse refs during production rendering and show a save row for each agent-produced file/artifact reference.
+- Wired agent text messages to render parsed reference save actions below the markdown body.
+- Wired default tool input/output rendering to expose save actions for refs in tool payloads and results.
+- Save actions use the current `sessionId`, `sync.getCredentials()`, existing encrypted attachment download API, and `sync.fetchArtifactWithBody` for artifact refs.
+- The UI reports saved local URI or error state after the user triggers a save.
+- Added component integration coverage using a normalized agent text message to verify parse -> download dependency -> local file write, plus artifact save via `sync.fetchArtifactWithBody`.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/components/AgentFileReferenceDownloads.test.ts sources/sync/agentFileDownloads.test.ts sources/sync/apiAttachments.test.ts`
+  - 3 files / 21 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 60 files / 712 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.

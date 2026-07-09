@@ -16,6 +16,7 @@ import { parseToolUseError } from '@/utils/toolErrorParser';
 import { formatMCPTitle } from './views/MCPToolView';
 import { t } from '@/text';
 import { getTerminalToolCommand, shouldRenderToolCardHeader } from '@/utils/toolDisplay';
+import { AgentFileReferenceDownloads } from '../AgentFileReferenceDownloads';
 
 interface ToolViewProps {
     metadata: Metadata | null;
@@ -279,6 +280,12 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                         {tool.input && (
                             <ToolSectionView title={t('toolView.input')}>
                                 <CodeView code={JSON.stringify(tool.input, null, 2)} />
+                                {sessionId ? (
+                                    <AgentFileReferenceDownloads
+                                        source={tool.input}
+                                        sessionId={sessionId}
+                                    />
+                                ) : null}
                             </ToolSectionView>
                         )}
 
@@ -287,6 +294,12 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                                 <CodeView
                                     code={typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
                                 />
+                                {sessionId ? (
+                                    <AgentFileReferenceDownloads
+                                        source={tool.result}
+                                        sessionId={sessionId}
+                                    />
+                                ) : null}
                             </ToolSectionView>
                         )}
                     </View>

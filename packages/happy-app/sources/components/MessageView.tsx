@@ -12,6 +12,7 @@ import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { layout } from "./layout";
 import { parseLocalCommandMessage, isUserSlashCommandEcho } from './parseLocalCommandMessage';
+import { AgentFileReferenceDownloads } from './AgentFileReferenceDownloads';
 
 
 export const MessageView = React.memo((props: {
@@ -192,6 +193,7 @@ function AgentTextBlock(props: {
   return (
     <View style={styles.agentMessageContainer}>
       <MarkdownView markdown={props.message.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
+      <AgentFileReferenceDownloads source={props.message} sessionId={props.sessionId} />
     </View>
   );
 }

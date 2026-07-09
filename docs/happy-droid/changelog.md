@@ -21,3 +21,10 @@
 - Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
 - Planned coverage: image picker metadata/thumbhash preservation, document picker generic attachment state, composer wiring, attachment-only send behavior, happy-app typecheck, focused attachment tests, and quick validation.
 - AI review follow-up requires implementation-bearing changes in the current task range, including composer attachment wiring tests, pending attachment strip coverage, and generic attachment naming at the UI boundary.
+
+## 2026-07-04 - Agent Artifact/File Reference Downloads
+
+- Started P0 work to parse agent-produced artifact/file references and save referenced files locally from happy-app.
+- Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
+- Planned coverage: supported ref shape discovery, attachment/file download URL resolution, local save target handling, error reporting, happy-app typecheck, focused unit tests, quick validation, and Android APK environment check.
+- AI review follow-up requires production integration: render parsed agent/tool refs in the message UI, call download/save on user action, use `sync.fetchArtifactWithBody` for artifact refs, and show saved URI or error state.
