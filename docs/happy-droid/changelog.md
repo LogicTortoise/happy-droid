@@ -28,3 +28,10 @@
 - Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
 - Planned coverage: supported ref shape discovery, attachment/file download URL resolution, local save target handling, error reporting, happy-app typecheck, focused unit tests, quick validation, and Android APK environment check.
 - AI review follow-up requires production integration: render parsed agent/tool refs in the message UI, call download/save on user action, use `sync.fetchArtifactWithBody` for artifact refs, and show saved URI or error state.
+
+## 2026-07-10 - Downloaded Image Preview Experience
+
+- Started P0 work to improve downloaded agent file refs with image thumbnails and full-screen preview.
+- Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
+- Planned coverage: image MIME detection, saved image thumbnail rendering, full-screen preview open/close, non-image fallback row behavior, component integration tests, happy-app typecheck, quick/app validation, and Android APK environment check.
+- Implemented saved image detection for downloaded agent refs, thumbnail rendering, full-screen preview open/close, and component integration coverage while preserving non-image save rows.

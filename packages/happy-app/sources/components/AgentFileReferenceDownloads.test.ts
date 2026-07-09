@@ -24,9 +24,16 @@ vi.mock('@/text', () => ({
 
 vi.mock('react-native', () => ({
     ActivityIndicator: (props: Record<string, unknown>) => React.createElement('ActivityIndicator', props),
+    Modal: ({ children, visible, ...props }: Record<string, any>) => (
+        visible ? React.createElement('Modal', { ...props, visible }, children) : null
+    ),
     Pressable: ({ children, ...props }: Record<string, any>) => React.createElement('Pressable', props, children),
     Text: ({ children, ...props }: Record<string, any>) => React.createElement('Text', props, children),
     View: ({ children, ...props }: Record<string, any>) => React.createElement('View', props, children),
+}));
+
+vi.mock('expo-image', () => ({
+    Image: (props: Record<string, unknown>) => React.createElement('ExpoImage', props),
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -96,6 +103,56 @@ describe('AgentFileReferenceDownloads integration', () => {
             options: { encoding: 'base64' },
         }]);
         expect(textContent(renderer.root)).toContain('Success: file:///documents/happy-agent-downloads/report.pdf');
+        expect(renderer.root.findAllByType('ExpoImage')).toHaveLength(0);
+    });
+
+    it('shows a saved image thumbnail and opens a full-screen preview', async () => {
+        const { AgentFileReferenceDownloads } = await import('./AgentFileReferenceDownloads');
+        const fileSystem = createMemoryFileSystem();
+        const downloadAttachment = vi.fn().mockResolvedValue(new Uint8Array([255, 216, 255]));
+        let renderer: any;
+
+        await act(async () => {
+            renderer = TestRenderer.create(React.createElement(AgentFileReferenceDownloads, {
+                source: 'happy://file?ref=attachments%2Fsession-1%2Fphoto.jpg&name=photo.jpg&mimeType=image%2Fjpeg',
+                sessionId: 'session-1',
+                deps: { downloadAttachment, fileSystem },
+            }));
+        });
+
+        const saveButton = renderer.root.findByType('Pressable');
+        await act(async () => {
+            await saveButton.props.onPress();
+        });
+
+        expect(fileSystem.writes[0]).toMatchObject({
+            uri: 'file:///documents/happy-agent-downloads/photo.jpg',
+        });
+        const thumbnail = renderer.root.findByProps({ accessibilityLabel: 'Preview photo.jpg' });
+        expect(renderer.root.findAllByType('ExpoImage')).toHaveLength(1);
+        expect(renderer.root.findByType('ExpoImage').props).toMatchObject({
+            source: { uri: 'file:///documents/happy-agent-downloads/photo.jpg' },
+            contentFit: 'cover',
+        });
+
+        await act(async () => {
+            thumbnail.props.onPress();
+        });
+
+        const images = renderer.root.findAllByType('ExpoImage');
+        expect(images).toHaveLength(2);
+        expect(images[1].props).toMatchObject({
+            source: { uri: 'file:///documents/happy-agent-downloads/photo.jpg' },
+            contentFit: 'contain',
+        });
+        expect(renderer.root.findByType('Modal').props.visible).toBe(true);
+
+        const close = renderer.root.findByProps({ accessibilityLabel: 'Close preview' });
+        await act(async () => {
+            close.props.onPress();
+        });
+
+        expect(renderer.root.findAllByType('Modal')).toHaveLength(0);
     });
 
     it('saves an artifact ref through sync.fetchArtifactWithBody', async () => {

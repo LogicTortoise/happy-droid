@@ -323,3 +323,29 @@ Validation results:
 - FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
   - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
   - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.
+
+## 2026-07-10 - P0 Downloaded Image Preview Experience
+
+Implementation:
+
+- Added saved-image detection for agent-produced file refs using MIME type first and image filename/URI extensions as fallback.
+- Rendered a thumbnail for saved downloaded image refs while leaving non-image file/artifact rows as save-status rows only.
+- Added a full-screen image preview modal opened from the saved thumbnail and closed through an overlay close action.
+- Kept the existing encrypted attachment/artifact download and local save flow unchanged.
+- Added component integration coverage for the save -> thumbnail -> full-screen preview path and for non-image rows not rendering image previews.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/components/AgentFileReferenceDownloads.test.ts sources/sync/agentFileDownloads.test.ts sources/sync/apiAttachments.test.ts`
+  - 3 files / 22 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - `pnpm install --frozen-lockfile`: pass.
+  - `pnpm --filter @slopus/happy-wire build`: pass.
+  - `pnpm --filter happy-app typecheck`: pass.
+  - Focused attachment tests: pass, 3 files / 55 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - Full app Vitest suite passed, 60 files / 713 tests.
+- FAIL, environment blocker unchanged: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle failed before compilation because current Java is 8 and Gradle requires JVM 17 or later.
+  - No proxy, VPN, Tailscale, Java, SDK, or host network configuration was changed.

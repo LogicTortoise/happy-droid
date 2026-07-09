@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Modal as RNModal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { sync } from '@/sync/sync';
@@ -29,6 +30,7 @@ export function AgentFileReferenceDownloads({ source, sessionId, deps }: AgentFi
     const { theme } = useUnistyles();
     const refs = React.useMemo(() => parseAgentFileReferences(source), [source]);
     const [states, setStates] = React.useState<Record<string, DownloadState>>({});
+    const [previewFile, setPreviewFile] = React.useState<SavedAgentFile | null>(null);
 
     if (refs.length === 0) {
         return null;
@@ -90,6 +92,25 @@ export function AgentFileReferenceDownloads({ source, sessionId, deps }: AgentFi
                                     {t('common.error')}: {state.message}
                                 </Text>
                             )}
+                            {state.status === 'saved' && isPreviewableImageFile(state.file) && (
+                                <Pressable
+                                    accessibilityLabel={`Preview ${state.file.name}`}
+                                    onPress={() => setPreviewFile(state.file)}
+                                    style={(pressed) => [
+                                        styles.thumbnailButton,
+                                        {
+                                            borderColor: theme.colors.divider,
+                                            opacity: pressed.pressed ? 0.85 : 1,
+                                        },
+                                    ]}
+                                >
+                                    <Image
+                                        source={{ uri: state.file.uri }}
+                                        style={styles.thumbnailImage}
+                                        contentFit="cover"
+                                    />
+                                </Pressable>
+                            )}
                         </View>
                         <Pressable
                             onPress={() => saveReference(reference)}
@@ -110,6 +131,37 @@ export function AgentFileReferenceDownloads({ source, sessionId, deps }: AgentFi
                     </View>
                 );
             })}
+            <RNModal
+                visible={previewFile !== null}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setPreviewFile(null)}
+            >
+                <View style={styles.previewBackdrop}>
+                    <Pressable
+                        accessibilityLabel="Close preview"
+                        onPress={() => setPreviewFile(null)}
+                        style={(pressed) => [
+                            styles.previewCloseButton,
+                            { opacity: pressed.pressed ? 0.7 : 1 },
+                        ]}
+                    >
+                        <Ionicons name="close" size={26} color="#ffffff" />
+                    </Pressable>
+                    {previewFile && (
+                        <>
+                            <Image
+                                source={{ uri: previewFile.uri }}
+                                style={styles.previewImage}
+                                contentFit="contain"
+                            />
+                            <Text style={styles.previewName} numberOfLines={2}>
+                                {previewFile.name}
+                            </Text>
+                        </>
+                    )}
+                </View>
+            </RNModal>
         </View>
     );
 }
@@ -118,6 +170,24 @@ function referenceKey(reference: AgentFileReference): string {
     return reference.kind === 'file'
         ? `file:${reference.sessionId ?? ''}:${reference.ref}`
         : `artifact:${reference.artifactId}`;
+}
+
+export function isPreviewableImageFile(file: Pick<SavedAgentFile, 'mimeType' | 'name' | 'uri'>): boolean {
+    const mimeType = file.mimeType?.split(';', 1)[0]?.trim().toLowerCase();
+    if (mimeType?.startsWith('image/')) {
+        return mimeType !== 'image/svg+xml';
+    }
+
+    const candidate = `${file.name} ${decodeURIComponentSafe(file.uri)}`.toLowerCase();
+    return /\.(png|jpe?g|gif|webp|bmp|heic|heif)(?:$|[?#\s])/.test(candidate);
+}
+
+function decodeURIComponentSafe(value: string): string {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
 }
 
 const styles = StyleSheet.create(() => ({
@@ -146,6 +216,18 @@ const styles = StyleSheet.create(() => ({
         fontSize: 11,
         marginTop: 2,
     },
+    thumbnailButton: {
+        width: 72,
+        height: 72,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginTop: 8,
+        overflow: 'hidden',
+    },
+    thumbnailImage: {
+        width: '100%',
+        height: '100%',
+    },
     saveButton: {
         minWidth: 48,
         minHeight: 28,
@@ -156,5 +238,34 @@ const styles = StyleSheet.create(() => ({
     saveText: {
         fontSize: 13,
         fontWeight: '600',
+    },
+    previewBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.94)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    previewCloseButton: {
+        position: 'absolute',
+        top: 48,
+        right: 20,
+        zIndex: 1,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255, 255, 255, 0.16)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewImage: {
+        width: '100%',
+        height: '82%',
+    },
+    previewName: {
+        color: '#ffffff',
+        fontSize: 13,
+        marginTop: 14,
+        textAlign: 'center',
     },
 }));
