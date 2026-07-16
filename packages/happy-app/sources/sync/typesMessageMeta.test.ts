@@ -6,9 +6,11 @@ describe('MessageMetaSchema', () => {
         const parsed = MessageMetaSchema.parse({
             permissionMode: 'team-custom-mode',
             model: 'custom-model',
+            voiceMode: true,
         });
 
         expect(parsed.permissionMode).toBe('team-custom-mode');
         expect(parsed.model).toBe('custom-model');
+        expect(parsed.voiceMode).toBe(true);
     });
 });

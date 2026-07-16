@@ -555,6 +555,24 @@ describe('runClaude remote JSONL scanner', () => {
         await harness.finish();
     });
 
+    it('keeps consecutive voice messages isolated from adjacent normal input', async () => {
+        const harness = await startRemoteRunClaudeHarness();
+        const userMessageHandler = harness.sessionClient.onUserMessage.mock.calls[0][0];
+
+        await userMessageHandler({ content: { text: 'normal before' }, localKey: 'normal-1', meta: {} });
+        await userMessageHandler({ content: { text: 'voice one' }, localKey: 'voice-1', meta: { voiceMode: true } });
+        await userMessageHandler({ content: { text: 'voice two' }, localKey: 'voice-2', meta: { voiceMode: true } });
+        await userMessageHandler({ content: { text: 'normal after' }, localKey: 'normal-2', meta: {} });
+
+        expect(harness.loopOptions.messageQueue.queue).toEqual([
+            expect.objectContaining({ message: 'normal before', isolate: false }),
+            expect.objectContaining({ message: 'voice one', isolate: true, mode: expect.objectContaining({ voiceLocalId: 'voice-1' }) }),
+            expect.objectContaining({ message: 'voice two', isolate: true, mode: expect.objectContaining({ voiceLocalId: 'voice-2' }) }),
+            expect.objectContaining({ message: 'normal after', isolate: false }),
+        ]);
+        await harness.finish();
+    });
+
     it('rejects a second Claude goal action while one is pending', async () => {
         const harness = await startRemoteRunClaudeHarness();
         await vi.waitFor(() => {

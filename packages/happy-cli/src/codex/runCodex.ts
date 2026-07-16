@@ -42,8 +42,8 @@ import { prepareCodexAttachmentInputItems } from './utils/imageInput';
 import { createSerialAsyncHandler } from './utils/serialAsyncHandler';
 import { buildCodexThreadBackfillEnvelopes } from './utils/threadImageBackfill';
 import {
-    buildCodexTurnPrompt,
     hashCodexEnhancedMode,
+    sendCodexTurnWithPrompt,
     type CodexEnhancedMode,
 } from './codexPrompt';
 import { discoverCodexSkillCommands } from './codexSkills';
@@ -341,18 +341,20 @@ export async function runCodex(opts: {
         } else {
             logger.debug(`[Codex] User message received with no append system prompt override, using current: ${currentAppendSystemPrompt ? 'set' : 'none'}`);
         }
-
         const enhancedMode: EnhancedMode = {
             permissionMode: messagePermissionMode || 'default',
             model: messageModel,
             appendSystemPrompt: messageAppendSystemPrompt,
             effort: messageEffort,
+            voiceMode: message.meta?.voiceMode === true,
+            ...(message.meta?.voiceMode && message.localKey ? { voiceLocalId: message.localKey } : {}),
         };
         const enqueueResult = enqueueCodexUserText({
             text: message.content.text,
             mode: enhancedMode,
             queue: messageQueue,
             attachments: attachmentsForThisMessage,
+            voiceMode: message.meta?.voiceMode,
         });
         if (enqueueResult === 'clear') {
             logger.debug('[Codex] /clear command pushed to isolated queue');
@@ -365,6 +367,7 @@ export async function runCodex(opts: {
     session.onUserMessage(handleUserMessage);
     let thinking = false;
     let currentTurnId: string | null = null;
+    let pendingTurnUserLocalId: string | undefined;
     let codexStartedSubagents = new Set<string>();
     let codexActiveSubagents = new Set<string>();
     let codexProviderSubagentToSessionSubagent = new Map<string, string>();
@@ -770,11 +773,15 @@ export async function runCodex(opts: {
         if (msg.type !== 'agent_reasoning_delta' && msg.type !== 'agent_reasoning' && msg.type !== 'agent_reasoning_section_break' && msg.type !== 'turn_diff') {
             const mapped = mapCodexMcpMessageToSessionEnvelopes(msg, {
                 currentTurnId,
+                pendingUserLocalId: pendingTurnUserLocalId,
                 startedSubagents: codexStartedSubagents,
                 activeSubagents: codexActiveSubagents,
                 providerSubagentToSessionSubagent: codexProviderSubagentToSessionSubagent,
             });
             currentTurnId = mapped.currentTurnId;
+            if (msg.type === 'task_started') {
+                pendingTurnUserLocalId = undefined;
+            }
             codexStartedSubagents = mapped.startedSubagents;
             codexActiveSubagents = mapped.activeSubagents;
             codexProviderSubagentToSessionSubagent = mapped.providerSubagentToSessionSubagent;
@@ -956,19 +963,20 @@ export async function runCodex(opts: {
                     });
                     continue;
                 }
-                const turnPrompt = buildCodexTurnPrompt({
+                pendingTurnUserLocalId = message.mode.voiceLocalId;
+                const result = await sendCodexTurnWithPrompt({
+                    sender: client,
                     message: message.message,
                     mode: message.mode,
                     includeAppendSystemPrompt,
                     includeTitleInstruction: first,
-                });
-
-                const result = await client.sendTurnAndWait(turnPrompt, {
-                    model: message.mode.model,
-                    approvalPolicy: executionPolicy.approvalPolicy,
-                    sandbox: executionPolicy.sandbox,
-                    effort: message.mode.effort,
-                    extraInputItems: attachmentInputs.inputItems,
+                    turnOptions: {
+                        model: message.mode.model,
+                        approvalPolicy: executionPolicy.approvalPolicy,
+                        sandbox: executionPolicy.sandbox,
+                        effort: message.mode.effort,
+                        extraInputItems: attachmentInputs.inputItems,
+                    },
                 });
                 first = false;
                 if (includeAppendSystemPrompt) {
@@ -986,6 +994,7 @@ export async function runCodex(opts: {
                 messageBuffer.addMessage('Process exited unexpectedly', 'status');
                 session.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
             } finally {
+                pendingTurnUserLocalId = undefined;
                 // Reset permission handler, reasoning processor, and diff processor
                 permissionHandler.reset();
                 reasoningProcessor.abort();  // Use abort to properly finish any in-progress tool calls

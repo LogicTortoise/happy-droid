@@ -30,6 +30,7 @@ import { connectionState } from '@/utils/serverConnectionErrors';
 import { OpenClawBackend } from './OpenClawBackend';
 import type { OpenClawGatewayConfig } from './openclawTypes';
 import type { AgentMessage } from '@/agent/core';
+import { enqueueVoiceModePrompt, resolveVoiceModePromptForRunner } from '@/utils/voiceModePrompt';
 
 const TURN_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -195,7 +196,7 @@ export async function runOpenClaw(opts: RunOpenClawOptions): Promise<void> {
   }
 
   const sessionManager = new AcpSessionManager();
-  const messageQueue = new MessageQueue2<Record<string, never>>(() => '');
+  const messageQueue = new MessageQueue2<{ voiceLocalId?: string }>(() => '');
   let shouldExit = false;
   let abortController = new AbortController();
   let pendingTurn: PendingTurn | null = null;
@@ -270,7 +271,22 @@ export async function runOpenClaw(opts: RunOpenClawOptions): Promise<void> {
 
   session.onUserMessage((message) => {
     if (!message.content.text) return;
-    messageQueue.push(message.content.text, {});
+    const prompt = resolveVoiceModePromptForRunner({
+      runner: 'openclaw',
+      message: message.content.text,
+      voiceMode: message.meta?.voiceMode,
+    }).message;
+    if (message.meta?.voiceMode) {
+      log('Voice mode prompt applied to current user turn');
+    }
+    enqueueVoiceModePrompt({
+      queue: messageQueue,
+      message: prompt,
+      mode: message.meta?.voiceMode && message.localKey
+        ? { voiceLocalId: message.localKey }
+        : {},
+      voiceMode: message.meta?.voiceMode,
+    });
   });
   session.keepAlive(thinking, 'remote');
 
@@ -323,7 +339,7 @@ export async function runOpenClaw(opts: RunOpenClawOptions): Promise<void> {
 
       log(`Incoming prompt: ${batch.message.slice(0, 200)}`);
       inTurn = true;
-      sendEnvelopes(sessionManager.startTurn());
+      sendEnvelopes(sessionManager.startTurn(batch.mode.voiceLocalId));
       const turnEnded = waitForTurnEnd();
       try {
         await backend.sendPrompt(started.sessionId, batch.message);

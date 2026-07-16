@@ -37,7 +37,7 @@ import { GeminiDisplay } from '@/ui/ink/GeminiDisplay';
 import { GeminiPermissionHandler } from '@/gemini/utils/permissionHandler';
 import { GeminiReasoningProcessor } from '@/gemini/utils/reasoningProcessor';
 import { GeminiDiffProcessor } from '@/gemini/utils/diffProcessor';
-import type { GeminiMode, CodexMessagePayload } from '@/gemini/types';
+import type { GeminiMode } from '@/gemini/types';
 import type { PermissionMode } from '@/api/types';
 import { GEMINI_MODEL_ENV, DEFAULT_GEMINI_MODEL, CHANGE_TITLE_INSTRUCTION } from '@/gemini/constants';
 import {
@@ -51,6 +51,9 @@ import {
   formatOptionsXml,
 } from '@/gemini/utils/optionsParser';
 import { ConversationHistory } from '@/gemini/utils/conversationHistory';
+import { enqueueVoiceModePrompt, resolveVoiceModePromptForRunner } from '@/utils/voiceModePrompt';
+import { GeminiSessionProtocol } from '@/gemini/GeminiSessionProtocol';
+import type { SessionTurnEndStatus } from '@slopus/happy-wire';
 
 
 /**
@@ -207,6 +210,12 @@ export async function runGemini(opts: {
     permissionMode: mode.permissionMode,
     model: mode.model,
   }));
+  const sessionProtocol = new GeminiSessionProtocol();
+  const sendEnvelopes = (envelopes: ReturnType<GeminiSessionProtocol['startTurn']>) => {
+    for (const envelope of envelopes) {
+      session.sendSessionProtocolMessage(envelope);
+    }
+  };
 
   // Conversation history for context preservation across model changes
   const conversationHistory = new ConversationHistory({ maxMessages: 20, maxCharacters: 50000 });
@@ -279,13 +288,27 @@ export async function runGemini(opts: {
       fullPrompt = message.meta.appendSystemPrompt + '\n\n' + originalUserMessage + '\n\n' + CHANGE_TITLE_INSTRUCTION;
       isFirstMessage = false;
     }
+    fullPrompt = resolveVoiceModePromptForRunner({
+      runner: 'gemini',
+      message: fullPrompt,
+      voiceMode: message.meta?.voiceMode,
+    }).message;
+    if (message.meta?.voiceMode) {
+      logger.debug('[Gemini] Voice mode prompt applied to current user turn');
+    }
 
     const mode: GeminiMode = {
       permissionMode: messagePermissionMode || 'default',
       model: messageModel,
       originalUserMessage, // Store original message separately
+      ...(message.meta?.voiceMode && message.localKey ? { voiceLocalId: message.localKey } : {}),
     };
-    messageQueue.push(fullPrompt, mode);
+    enqueueVoiceModePrompt({
+      queue: messageQueue,
+      message: fullPrompt,
+      mode,
+      voiceMode: message.meta?.voiceMode,
+    });
     
     // Record user message in conversation history for context preservation
     conversationHistory.addUserMessage(originalUserMessage);
@@ -351,12 +374,6 @@ export async function runGemini(opts: {
 
   async function handleAbort() {
     logger.debug('[Gemini] Abort requested - stopping current task');
-    
-    // Send turn_aborted event (like Codex) when abort is requested
-    session.sendAgentMessage('gemini', {
-      type: 'turn_aborted',
-      id: randomUUID(),
-    });
     
     // Abort reasoning processor and reset diff processor
     reasoningProcessor.abort();
@@ -547,6 +564,8 @@ export async function runGemini(opts: {
   function setupGeminiMessageHandler(backend: AgentBackend): void {
     backend.onMessage((msg: AgentMessage) => {
 
+    sendEnvelopes(sessionProtocol.mapBackendMessage(msg));
+
     switch (msg.type) {
       case 'model-output':
         if (msg.textDelta) {
@@ -579,24 +598,13 @@ export async function runGemini(opts: {
         if (msg.status === 'error') {
           logger.debug(`[gemini] ⚠️ Error status received: ${statusDetail || 'Unknown error'}`);
           
-          // Send turn_aborted event (like Codex) when error occurs
-          session.sendAgentMessage('gemini', {
-            type: 'turn_aborted',
-            id: randomUUID(),
-          });
         }
         
         if (msg.status === 'running') {
           thinking = true;
           session.keepAlive(thinking, 'remote');
           
-          // Send task_started event ONCE per turn (like Codex) when agent starts working
-          // Gemini may go running -> idle -> running multiple times during a turn
           if (!taskStartedSent) {
-            session.sendAgentMessage('gemini', {
-              type: 'task_started',
-              id: randomUUID(),
-            });
             taskStartedSent = true;
           }
           
@@ -672,13 +680,6 @@ export async function runGemini(opts: {
         }
         
         messageBuffer.addMessage(`Executing: ${msg.toolName}${toolArgs ? ` ${toolArgs}${toolArgs.length >= 100 ? '...' : ''}` : ''}`, 'tool');
-        session.sendAgentMessage('gemini', {
-          type: 'tool-call',
-          name: msg.toolName,
-          callId: msg.callId,
-          input: msg.args,
-          id: randomUUID(),
-        });
         break;
 
       case 'tool-result':
@@ -721,12 +722,6 @@ export async function runGemini(opts: {
           messageBuffer.addMessage(`Result: ${truncatedResult}`, 'result');
         }
         
-        session.sendAgentMessage('gemini', {
-          type: 'tool-result',
-          callId: msg.callId,
-          output: msg.result,
-          id: randomUUID(),
-        });
         break;
 
       case 'fs-edit':
@@ -879,11 +874,6 @@ export async function runGemini(opts: {
             // For titled reasoning, ReasoningProcessor will send tool call, but we keep "Thinking..." visible
             // This ensures user sees progress during long reasoning operations
           }
-          // Also forward to mobile for UI feedback
-          session.sendAgentMessage('gemini', {
-            type: 'thinking',
-            text: thinkingText,
-          });
         }
         break;
     }
@@ -999,6 +989,9 @@ export async function runGemini(opts: {
 
       // Mark that we're processing a message to synchronize session swaps
       isProcessingMessage = true;
+      let protocolTurnStatus: SessionTurnEndStatus = 'completed';
+      let protocolResponseText: string | undefined;
+      sendEnvelopes(sessionProtocol.startTurn(message.mode.voiceLocalId));
 
       try {
         if (first || !wasSessionCreated) {
@@ -1155,6 +1148,7 @@ export async function runGemini(opts: {
       } catch (error) {
         logger.debug('[gemini] Error in gemini session:', error);
         const isAbortError = error instanceof Error && error.name === 'AbortError';
+        protocolTurnStatus = isAbortError ? 'cancelled' : 'failed';
 
         if (isAbortError) {
           messageBuffer.addMessage('Aborted by user', 'status');
@@ -1255,25 +1249,12 @@ export async function runGemini(opts: {
             logger.debug(`[gemini] Warning: Incomplete options block detected`);
           }
           
-          const messagePayload: CodexMessagePayload = {
-            type: 'message',
-            message: finalMessageText,
-            id: randomUUID(),
-            ...(options.length > 0 && { options }),
-          };
-          
           logger.debug(`[gemini] Sending complete message to mobile (length: ${finalMessageText.length}): ${finalMessageText.substring(0, 100)}...`);
-          session.sendAgentMessage('gemini', messagePayload);
+          protocolResponseText = finalMessageText;
           accumulatedResponse = '';
           isResponseInProgress = false;
         }
-        
-        // Send task_complete ONCE at the end of turn (not on every idle)
-        // This signals to the UI that the agent has finished processing
-        session.sendAgentMessage('gemini', {
-          type: 'task_complete',
-          id: randomUUID(),
-        });
+        sendEnvelopes(sessionProtocol.endTurn(protocolTurnStatus, protocolResponseText));
         
         // Reset tracking flags
         hadToolCallInTurn = false;

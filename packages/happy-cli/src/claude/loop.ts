@@ -25,6 +25,8 @@ export interface EnhancedMode {
     disallowedTools?: string[];
     /** Effort level passed through to the Claude Agent SDK as the `effort` option. */
     effort?: ClaudeEffort;
+    /** Correlates an isolated app voice prompt with its protocol turn. */
+    voiceLocalId?: string;
 }
 
 interface LoopOptions {

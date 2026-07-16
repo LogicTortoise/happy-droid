@@ -29,6 +29,7 @@ import {
   mergeAcpSessionConfigIntoMetadata,
 } from './sessionConfigMetadata';
 import type { SessionConfigOption, SessionModeState, SessionModelState } from '@agentclientprotocol/sdk';
+import { enqueueVoiceModePrompt, resolveVoiceModePromptForRunner } from '@/utils/voiceModePrompt';
 
 const TURN_TIMEOUT_MS = 5 * 60 * 1000;
 const ACP_EVENT_PREVIEW_CHARS = 240;
@@ -269,6 +270,7 @@ function formatEnvelopeForServerLog(agentName: string, envelope: SessionEnvelope
 type AcpSwitchMode = {
   permissionMode?: string;
   model?: string | null;
+  voiceLocalId?: string;
 };
 
 type AcpSelectableOption = {
@@ -845,9 +847,23 @@ export async function runAcp(opts: {
       logger.debug(`[${opts.agentName}] Requested ACP model: ${currentModel ?? 'null'}`);
     }
 
-    messageQueue.push(message.content.text, {
-      permissionMode: currentPermissionMode,
-      model: currentModel,
+    const prompt = resolveVoiceModePromptForRunner({
+      runner: 'acp',
+      message: message.content.text,
+      voiceMode: message.meta?.voiceMode,
+    }).message;
+    if (message.meta?.voiceMode) {
+      logger.debug(`[${opts.agentName}] Voice mode prompt applied to current user turn`);
+    }
+    enqueueVoiceModePrompt({
+      queue: messageQueue,
+      message: prompt,
+      mode: {
+        permissionMode: currentPermissionMode,
+        model: currentModel,
+        ...(message.meta?.voiceMode && message.localKey ? { voiceLocalId: message.localKey } : {}),
+      },
+      voiceMode: message.meta?.voiceMode,
     });
   });
   session.keepAlive(thinking, 'remote');
@@ -911,7 +927,7 @@ export async function runAcp(opts: {
       }
 
       logAcp('incoming', `Incoming prompt: ${formatUnknownForConsole(batch.message, ACP_EVENT_PREVIEW_CHARS)}`);
-      sendEnvelopes(sessionManager.startTurn());
+      sendEnvelopes(sessionManager.startTurn(batch.mode.voiceLocalId));
       const turnEnded = waitForTurnEnd();
       try {
         if (typeof batch.mode.permissionMode === 'string' && batch.mode.permissionMode.length > 0) {

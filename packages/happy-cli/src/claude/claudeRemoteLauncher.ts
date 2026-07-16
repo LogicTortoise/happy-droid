@@ -333,6 +333,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                             let p = pending;
                             pending = null;
                             permissionHandler.handleModeChange(p.mode.permissionMode);
+                            session.client.setClaudeTurnUserLocalId(p.mode.voiceLocalId);
                             return p;
                         }
 
@@ -348,6 +349,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                             modeHash = msg.hash;
                             mode = msg.mode;
                             permissionHandler.handleModeChange(mode.permissionMode);
+                            session.client.setClaudeTurnUserLocalId(mode.voiceLocalId);
 
                             // Per-message attachments are already claimed by the message
                             // when it was pushed onto the queue, so there is no race window

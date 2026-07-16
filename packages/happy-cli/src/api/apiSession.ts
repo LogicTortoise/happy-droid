@@ -722,6 +722,10 @@ export class ApiSessionClient extends EventEmitter {
         this.applyClaudeSessionMessageSideEffects(body);
     }
 
+    setClaudeTurnUserLocalId(userLocalId: string | undefined) {
+        this.claudeSessionProtocolState.pendingUserLocalId = userLocalId;
+    }
+
     async sendClaudeSessionMessageFromLocalTranscript(body: RawJSONLines): Promise<void> {
         const attachments = extractLocalTranscriptImageAttachments(body);
         if (attachments.length === 0) {

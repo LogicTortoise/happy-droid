@@ -1,6 +1,14 @@
 import { AgentEvent } from "./typesRaw";
 import { MessageMeta } from "./typesMessageMeta";
 
+export type SessionTurnStatus = 'started' | 'completed' | 'failed' | 'cancelled';
+
+type MessageProtocolContext = {
+    serverSequence?: number;
+    turnId?: string;
+    turnStatus?: SessionTurnStatus;
+};
+
 export type ToolCall = {
     name: string;
     state: 'running' | 'completed' | 'error';
@@ -41,15 +49,16 @@ export type UserTextMessage = {
      * the rewind point when duplicating/forking Codex threads.
      */
     codexItemId?: string;
-}
+} & MessageProtocolContext;
 
 export type ModeSwitchMessage = {
     kind: 'agent-event';
     id: string;
+    localId?: string | null;
     createdAt: number;
     event: AgentEvent;
     meta?: MessageMeta;
-}
+} & MessageProtocolContext;
 
 export type AgentTextMessage = {
     kind: 'agent-text';
@@ -59,7 +68,7 @@ export type AgentTextMessage = {
     text: string;
     isThinking?: boolean;
     meta?: MessageMeta;
-}
+} & MessageProtocolContext;
 
 export type ToolCallMessage = {
     kind: 'tool-call';
@@ -69,6 +78,6 @@ export type ToolCallMessage = {
     tool: ToolCall;
     children: Message[];
     meta?: MessageMeta;
-}
+} & MessageProtocolContext;
 
 export type Message = UserTextMessage | AgentTextMessage | ToolCallMessage | ModeSwitchMessage;

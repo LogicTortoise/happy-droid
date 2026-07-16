@@ -42,6 +42,7 @@ import { GitFileStatus } from '@/sync/gitStatusFiles';
 import { useOverlayNav } from '@/-session/sessionOverlayNav';
 import { formatPathRelativeToHome, getResumeCommandBlock, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
 import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
+import { useLocalAndroidVoiceMode } from '@/hooks/useLocalAndroidVoiceMode';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -504,12 +505,20 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         clearAttachments,
         addAttachments,
     } = useImagePicker();
-
     // ChatComposer owns the message state + useDraft subscription. We only
     // hold an imperative handle so handleSend can read the live text and
     // clear it without subscribing to it (which would re-render the whole
     // SessionViewLoaded tree on every keystroke).
     const composerHandleRef = React.useRef<ChatComposerHandle | null>(null);
+    const clearComposerMessage = React.useCallback(() => {
+        composerHandleRef.current?.clearMessage();
+    }, []);
+    const localAndroidVoice = useLocalAndroidVoiceMode({
+        enabled: Platform.OS === 'android',
+        sessionId,
+        messages,
+        clearComposerMessage,
+    });
 
     // Handle dismissing CLI version warning
     const handleDismissCliWarning = React.useCallback(() => {
@@ -617,6 +626,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     // Handle microphone button press - memoized to prevent button flashing
     const handleMicrophonePress = React.useCallback(async () => {
+        if (Platform.OS === 'android') {
+            await localAndroidVoice.onMicrophonePress();
+            return;
+        }
+
         if (realtimeStatus === 'connecting') {
             return; // Prevent actions during transitions
         }
@@ -656,13 +670,15 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             // Notify voice assistant about voice session stop
             voiceHooks.onVoiceStopped();
         }
-    }, [realtimeStatus, sessionId]);
+    }, [localAndroidVoice.onMicrophonePress, realtimeStatus, sessionId]);
 
     // Memoize mic button state to prevent flashing during chat transitions
     const micButtonState = useMemo(() => ({
         onMicPress: handleMicrophonePress,
-        isMicActive: realtimeStatus === 'connected' || realtimeStatus === 'connecting'
-    }), [handleMicrophonePress, realtimeStatus]);
+        isMicActive: Platform.OS === 'android'
+            ? localAndroidVoice.isListening || localAndroidVoice.isSpeaking
+            : realtimeStatus === 'connected' || realtimeStatus === 'connecting'
+    }), [handleMicrophonePress, localAndroidVoice.isListening, localAndroidVoice.isSpeaking, realtimeStatus]);
 
     // Trigger session visibility and initialize git status sync
     React.useLayoutEffect(() => {

@@ -110,7 +110,7 @@
  * - Updated internal state for future processing
  */
 
-import { Message, ToolCall } from "../typesMessage";
+import { Message, ToolCall, type SessionTurnStatus } from "../typesMessage";
 import { AgentEvent, NormalizedMessage, UsageData } from "../typesRaw";
 import { createTracer, traceMessages, TracerState } from "./reducerTracer";
 import { AgentState, TodoItem, TodoItemsSchema } from "../storageTypes";
@@ -130,6 +130,9 @@ type ReducerMessage = {
     meta?: MessageMeta;
     claudeUuid?: string;
     codexItemId?: string;
+    serverSequence?: number;
+    turnId?: string;
+    turnStatus?: SessionTurnStatus;
 }
 
 type StoredPermission = {
@@ -296,17 +299,46 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
     for (const msg of nonSidechainMessages) {
         // Check if we've already processed this message
         if (msg.role === 'user' && msg.localId && state.localIds.has(msg.localId)) {
+            const existingId = state.localIds.get(msg.localId);
+            const existing = existingId ? state.messages.get(existingId) : undefined;
+            if (existing && msg.serverSequence !== undefined && existing.serverSequence !== msg.serverSequence) {
+                existing.serverSequence = msg.serverSequence;
+                existing.realID = msg.id;
+                changed.add(existing.id);
+            }
             continue;
         }
         if (state.messageIds.has(msg.id)) {
             continue;
         }
 
-        // Filter out ready events completely - they should not create any message
+        // Preserve protocol turn boundaries for non-visual consumers such as local TTS.
         if (msg.role === 'event' && msg.content.type === 'ready') {
-            // Mark as processed to prevent duplication but don't add to messages
-            state.messageIds.set(msg.id, msg.id);
-            hasReadyEvent = true;
+            if (!msg.turnId || !msg.turnStatus) {
+                state.messageIds.set(msg.id, msg.id);
+                hasReadyEvent = true;
+                continue;
+            }
+            const mid = allocateId();
+            state.messageIds.set(msg.id, mid);
+            state.messages.set(mid, {
+                id: mid,
+                localId: msg.localId,
+                realID: msg.id,
+                role: 'agent',
+                createdAt: msg.createdAt,
+                event: msg.content,
+                tool: null,
+                text: null,
+                meta: msg.meta,
+                serverSequence: msg.serverSequence,
+                turnId: msg.turnId,
+                turnStatus: msg.turnStatus,
+            });
+            changed.add(mid);
+            if (msg.turnStatus !== 'started') {
+                hasReadyEvent = true;
+            }
             continue;
         }
 
@@ -671,6 +703,9 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                 meta: msg.meta,
                 claudeUuid: msg.claudeUuid,
                 codexItemId: msg.codexItemId,
+                serverSequence: msg.serverSequence,
+                turnId: msg.turnId,
+                turnStatus: msg.turnStatus,
             });
 
             // Track both localId and messageId
@@ -709,6 +744,9 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                         tool: null,
                         event: null,
                         meta: msg.meta,
+                        serverSequence: msg.serverSequence,
+                        turnId: msg.turnId,
+                        turnStatus: msg.turnStatus,
                     });
                     changed.add(mid);
                 }
@@ -1090,6 +1128,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
             let mid = allocateId();
             state.messages.set(mid, {
                 id: mid,
+                localId: msg.localId,
                 realID: msg.id,
                 role: 'agent',
                 createdAt: msg.createdAt,
@@ -1097,6 +1136,9 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                 tool: null,
                 text: null,
                 meta: msg.meta,
+                serverSequence: msg.serverSequence,
+                turnId: msg.turnId,
+                turnStatus: msg.turnStatus,
             });
             changed.add(mid);
         }
@@ -1173,7 +1215,10 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             ...(reducerMsg.meta?.displayText && { displayText: reducerMsg.meta.displayText }),
             ...(reducerMsg.claudeUuid && { claudeUuid: reducerMsg.claudeUuid }),
             ...(reducerMsg.codexItemId && { codexItemId: reducerMsg.codexItemId }),
-            meta: reducerMsg.meta
+            meta: reducerMsg.meta,
+            serverSequence: reducerMsg.serverSequence,
+            turnId: reducerMsg.turnId,
+            turnStatus: reducerMsg.turnStatus,
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.text !== null) {
         return {
@@ -1183,7 +1228,10 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             kind: 'agent-text',
             text: reducerMsg.text,
             ...(reducerMsg.isThinking && { isThinking: true }),
-            meta: reducerMsg.meta
+            meta: reducerMsg.meta,
+            serverSequence: reducerMsg.serverSequence,
+            turnId: reducerMsg.turnId,
+            turnStatus: reducerMsg.turnStatus,
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.tool !== null) {
         // Convert children recursively
@@ -1203,15 +1251,22 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             kind: 'tool-call',
             tool: { ...reducerMsg.tool },
             children: childMessages,
-            meta: reducerMsg.meta
+            meta: reducerMsg.meta,
+            serverSequence: reducerMsg.serverSequence,
+            turnId: reducerMsg.turnId,
+            turnStatus: reducerMsg.turnStatus,
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.event !== null) {
         return {
             id: reducerMsg.id,
+            localId: reducerMsg.localId ?? null,
             createdAt: reducerMsg.createdAt,
             kind: 'agent-event',
             event: reducerMsg.event,
-            meta: reducerMsg.meta
+            meta: reducerMsg.meta,
+            serverSequence: reducerMsg.serverSequence,
+            turnId: reducerMsg.turnId,
+            turnStatus: reducerMsg.turnStatus,
         };
     }
 

@@ -40,6 +40,7 @@ describe('session protocol schemas', () => {
                 image: { width: 640, height: 480 },
             },
             { t: 'turn-start' },
+            { t: 'turn-start', userLocalId: 'voice-local-id' },
             { t: 'start', title: 'Research agent' },
             { t: 'turn-end', status: 'completed' },
             { t: 'stop' },

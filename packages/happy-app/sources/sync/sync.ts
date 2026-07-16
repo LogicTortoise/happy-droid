@@ -96,6 +96,7 @@ type SendMessageOptions = {
     localId?: string;
     /** Optional attachments to send before the text message. */
     attachments?: AttachmentPreview[];
+    voiceMode?: boolean;
 };
 
 export type SendMessageResult = {
@@ -683,7 +684,7 @@ class Sync {
         }
 
         const modeMeta = resolveMessageModeMeta(session, storage.getState().settings);
-        const { displayText, source = 'chat', attachments } = options ?? {};
+        const { displayText, source = 'chat', attachments, voiceMode } = options ?? {};
 
         const flavor = session.metadata?.flavor;
         const attachmentPlan = getAttachmentSendPlan({
@@ -795,13 +796,15 @@ class Sync {
                 type: 'text',
                 text
             },
+            localKey: localId,
             meta: {
                 sentFrom,
                 appendSystemPrompt: systemPrompt,
                 ...(modeMeta.permissionMode !== undefined ? { permissionMode: modeMeta.permissionMode } : {}),
                 ...(modeMeta.model !== undefined ? { model: modeMeta.model } : {}),
                 ...(modeMeta.effort !== undefined ? { effort: modeMeta.effort } : {}),
-                ...(displayText && { displayText }) // Add displayText if provided
+                ...(displayText && { displayText }), // Add displayText if provided
+                ...(voiceMode ? { voiceMode: true } : {}),
             }
         };
         const encryptedRawRecord = await encryption.encryptRawRecord(content);
@@ -2116,7 +2119,7 @@ class Sync {
         for (let i = 0; i < decryptedMessages.length; i++) {
             const decrypted = decryptedMessages[i];
             if (!decrypted) continue;
-            const normalized = normalizeRawMessage(decrypted.id, decrypted.localId, decrypted.createdAt, decrypted.content);
+            const normalized = normalizeRawMessage(decrypted.id, decrypted.localId, decrypted.createdAt, decrypted.content, decrypted.seq);
             if (normalized) {
                 normalizedMessages.push(normalized);
             }
@@ -2261,7 +2264,7 @@ class Sync {
             if (updateData.body.message) {
                 const decrypted = await encryption.decryptMessage(updateData.body.message);
                 if (decrypted) {
-                    lastMessage = normalizeRawMessage(decrypted.id, decrypted.localId, decrypted.createdAt, decrypted.content);
+                    lastMessage = normalizeRawMessage(decrypted.id, decrypted.localId, decrypted.createdAt, decrypted.content, decrypted.seq);
 
                     // Check for task lifecycle events to update thinking state
                     // This ensures UI updates even if volatile activity updates are lost

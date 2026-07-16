@@ -142,6 +142,18 @@ export default {
             "expo-updates",
             "expo-asset",
             "expo-localization",
+            [
+                "expo-speech-recognition",
+                {
+                    microphonePermission: "Allow $(PRODUCT_NAME) to use the microphone for local voice input.",
+                    speechRecognitionPermission: "Allow $(PRODUCT_NAME) to transcribe local voice input.",
+                    androidSpeechServicePackages: [
+                        "com.google.android.tts",
+                        "com.google.android.googlequicksearchbox",
+                        "com.google.android.as",
+                    ],
+                },
+            ],
             "expo-mail-composer",
             "expo-secure-store",
             "expo-web-browser",

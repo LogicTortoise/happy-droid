@@ -7,6 +7,7 @@ import type { Thread, ThreadItem, ThreadTurn } from '../codexAppServerTypes';
 
 export type CodexTurnState = {
     currentTurnId: string | null;
+    pendingUserLocalId?: string;
     startedSubagents?: Set<string>;
     activeSubagents?: Set<string>;
     providerSubagentToSessionSubagent?: Map<string, string>;
@@ -413,7 +414,10 @@ export function mapCodexMcpMessageToSessionEnvelopes(message: Record<string, unk
 
     if (type === 'task_started') {
         const turnId = createId();
-        const turnStart = createEnvelope('agent', { t: 'turn-start' }, { turn: turnId });
+        const turnStart = createEnvelope('agent', {
+            t: 'turn-start',
+            ...(state.pendingUserLocalId ? { userLocalId: state.pendingUserLocalId } : {}),
+        }, { turn: turnId });
         startedSubagents.clear();
         activeSubagents.clear();
         providerSubagentToSessionSubagent.clear();

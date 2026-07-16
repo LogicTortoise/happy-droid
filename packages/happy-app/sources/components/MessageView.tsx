@@ -51,7 +51,7 @@ function RenderBlock(props: {
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
   onForkFromUserMessage?: (messageId: string, rewindPointId: string | undefined, messageText: string) => void;
-}): React.ReactElement {
+}): React.ReactElement | null {
   switch (props.message.kind) {
     case 'user-text':
       return (
@@ -202,6 +202,9 @@ function AgentEventBlock(props: {
   event: AgentEvent;
   metadata: Metadata | null;
 }) {
+  if (props.event.type === 'ready') {
+    return null;
+  }
   if (props.event.type === 'switch') {
     return (
       <View style={styles.agentEventContainer}>

@@ -37,7 +37,7 @@ test('dry-run appends a markdown E2E record without running build commands', () 
 
   const report = fs.readFileSync(reportPath, 'utf8');
   assert.match(report, /Recorder Test/);
-  assert.match(report, /SKIPPED: `\.\/gradlew :app:assembleDebug`/);
+  assert.match(report, /SKIPPED: `\.\/gradlew "-Dorg\.gradle\.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`/);
   assert.match(report, /APK artifacts:/);
   assert.match(report, /Constraint note: this recorder does not change Java/);
 });

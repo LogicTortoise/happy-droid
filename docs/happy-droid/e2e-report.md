@@ -424,6 +424,62 @@ Next action: fix the command failure above, then rerun this recorder so the repo
 
 Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
 
+## 2026-07-11 - P1 Voice Runner Isolation And Gemini Protocol Follow-up
+
+Status: AUTOMATED PASS; DEVICE BLOCKED
+
+Implementation evidence:
+
+- Gemini now emits one session-protocol `turn-start`, final text, and terminal `turn-end` per provider turn. Voice starts carry the originating user `localKey` as `userLocalId`.
+- Gemini, OpenClaw, and ACP enqueue voice prompts with `pushIsolated`, preserving queued normal prompts while preventing prompt or reply batching across the voice boundary.
+- The App prefers explicit `userLocalId` turn correlation and ignores explicitly associated unrelated turns; legacy producers retain sequence fallback.
+- Android `opened_dialog` now tells the user to finish the system download and retry. Only `download_success` reports speech data ready.
+
+Validation results:
+
+- PASS: `pnpm --filter @slopus/happy-wire exec vitest run` (2 files / 19 tests).
+- PASS: Gemini protocol mapper, five-runner prompt policy, and Gemini/OpenClaw/ACP normal -> voice -> normal queue tests (25 focused CLI tests).
+- PASS: real Gemini protocol bridge -> App normalize -> reducer -> correlated TTS integration, including unrelated turns and locale-matched voice selection.
+- PASS: `pnpm --filter happy-app exec vitest run` (67 files / 751 tests).
+- PASS: happy-app, happy-cli, and happy-wire type/build checks; quick and app validation groups.
+- PASS: Android `assembleDebug` and `assembleRelease` from source.
+- BASELINE FAIL: CLI unit project passed 75/76 files and 697 tests; `RemoteModeDisplay.test.ts` fails before tests because the installed `signal-exit` module has no default export. All voice runner/protocol tests passed.
+- FOLLOW-UP: happy-cli now declares the Ink-compatible `signal-exit@3.0.7` directly so pnpm's hoisted layout cannot substitute the incompatible v4 ESM API. Supervisor `*.stream.log` files are ignored as local worker state.
+- RESOLVED: `pnpm --filter happy exec vitest run --project unit` now passes 76/76 files and 702/702 tests; `RemoteModeDisplay.test.ts` passes 5/5. Frozen install and the quick validation group also exit 0.
+- BLOCKED: `adb devices` reported no connected target, so a fresh physical-device STT -> message -> provider reply -> matched-language TTS run could not be performed. No device or network configuration was changed.
+
+## 2026-07-10 - P1 Local Voice Mode Correlation Follow-up
+
+Status: REVIEW FAILED; DEVICE BLOCKED
+
+Superseded for automated coverage by `2026-07-11 - P1 Voice Runner Isolation And Gemini Protocol Follow-up` above. The physical-device acoustic run remains blocked.
+
+Required validation:
+
+- Every supported CLI runner applies the shared concise prompt when `voiceMode=true`.
+- A normalized voice user message is correlated by `localId` to its protocol turn; only text from that completed turn is spoken, independent of timestamp skew or concurrent turns.
+- TTS selects an installed voice matching the STT locale and surfaces localized fallback for discovery, stop, or start failures.
+- Focused app/wire/CLI tests, typechecks, quick validation, Android APK builds, and a logged-in device STT -> message -> runner prompt -> reply -> matched-language TTS run pass.
+
+Implementation validation:
+
+- PASS: all five supported runners resolve `voiceMode` through the shared provider prompt policy.
+- FAIL: Gemini legacy output does not emit protocol `turn-start`/`turn-end`, so the app cannot complete reply correlation or start TTS.
+- FAIL: Gemini/OpenClaw/ACP queue modes do not isolate voice input from adjacent normal input while an agent is busy; prompt leakage and over-broad TTS reply aggregation remain possible.
+- PASS: normalized messages retain server `seq`, protocol `turn`, and hidden turn lifecycle markers; optimistic user messages backfill server sequence by stable `localId`.
+- PASS at resolver unit scope only: local reply selection ignores timestamps and unrelated protocol turns, aggregates only a completed originating turn, and closes on completion/failure/replacement. Gemini and mixed queue integration coverage is still required.
+- PASS: TTS selects exact-locale then same-language voices, rejects unrelated-language fallback, and converts capability/stop/start failures into the existing localized degradation path.
+- PASS: 67 happy-app test files / 750 tests, happy-app and happy-cli typechecks, five-provider voice prompt helper tests, quick validation, and debug/release APK builds. These checks do not establish runner queue isolation or Gemini protocol lifecycle output.
+
+Device follow-up on 2026-07-11:
+
+- Target: logged-in Android 14 Google Play AVD `happy_voice_api34`; release APK installed; isolated Happy CLI machine `584566fa-aded-4719-a138-a6253608bdc8` paired successfully; Codex Session online.
+- Services present: `com.google.android.as` and `com.google.android.tts` recognition services plus Google TTS.
+- Android Emulator 36.6.11 `injectAudio` reset the local gRPC connection and terminated the AVD process with both JWT-local and explicit insecure localhost endpoints, before App STT could consume the sample.
+- The official `-allow-host-audio` path reached `AiAiSpeechRecognitionService` and logged speech start/end for two English samples, but the service returned code 7 `no-speech` both times. On shutdown the emulator reported `coreaudio: Could not initialize record`, `kAudioHardwareIllegalOperationError`, and `Failed to create voice virtio-snd-mic0`, confirming that this host process had no usable microphone backend. No transcript was produced, so no real `voiceMode` message or matched-language TTS playback could occur in this environment.
+- No physical Android target is connected. Device closure remains BLOCKED on an Android target that can supply intelligible microphone audio; automated normalization/reducer/TTS integration coverage passes.
+
+
 ## 2026-07-10 - P1 Telegram-Aligned Custom Instructions
 
 Scope:
@@ -622,5 +678,525 @@ APK artifacts:
 Overall result: FAIL (android-debug-apk, android-release-apk)
 
 Next action: fix the command failure above, then rerun this recorder so the report contains the updated command and APK artifact state.
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 07:40 - P1 Local Voice Mode
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-09T23:40:08.195Z
+- Finished: 2026-07-09T23:40:26.186Z
+
+Command results:
+
+- PASS: `pnpm install --frozen-lockfile`
+  - id: `install`, cwd: `.`, duration: 6.8s
+- PASS: `pnpm --filter @slopus/happy-wire build`
+  - id: `wire-build`, cwd: `.`, duration: 3.0s
+- PASS: `pnpm --filter happy-app typecheck`
+  - id: `app-typecheck`, cwd: `.`, duration: 2.4s
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/attachmentSupport.test.ts sources/sync/attachmentDiagnostics.test.ts sources/sync/apiAttachments.test.ts`
+  - id: `attachment-tests`, cwd: `.`, duration: 1.1s
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - id: `app-tests`, cwd: `.`, duration: 3.2s
+- FAIL: `./gradlew :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 430ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+- FAIL: `./gradlew :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 424ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 473542106 bytes
+  - mtime: 2026-07-03T11:36:10.183Z
+- release: missing at `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk`
+
+Overall result: FAIL (android-debug-apk, android-release-apk)
+
+Next action: fix the command failure above, then rerun this recorder so the report contains the updated command and APK artifact state.
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 07:41 - P1 Local Voice Mode Final
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-09T23:41:51.746Z
+- Finished: 2026-07-09T23:42:12.999Z
+
+Command results:
+
+- PASS: `pnpm install --frozen-lockfile`
+  - id: `install`, cwd: `.`, duration: 6.8s
+- PASS: `pnpm --filter @slopus/happy-wire build`
+  - id: `wire-build`, cwd: `.`, duration: 3.0s
+- PASS: `pnpm --filter happy-app typecheck`
+  - id: `app-typecheck`, cwd: `.`, duration: 5.8s
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/attachmentSupport.test.ts sources/sync/attachmentDiagnostics.test.ts sources/sync/apiAttachments.test.ts`
+  - id: `attachment-tests`, cwd: `.`, duration: 1.1s
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - id: `app-tests`, cwd: `.`, duration: 3.1s
+- FAIL: `./gradlew :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 427ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+- FAIL: `./gradlew :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 420ms
+  - exit: 1
+  - failure tail:
+
+```text
+Starting a Gradle Daemon (subsequent builds will be faster)
+FAILURE: Build failed with an exception.
+* What went wrong:
+Gradle requires JVM 17 or later to run. Your build is currently configured to use JVM 8.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+```
+
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 473542106 bytes
+  - mtime: 2026-07-03T11:36:10.183Z
+- release: missing at `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk`
+
+Overall result: FAIL (android-debug-apk, android-release-apk)
+
+Next action: fix the command failure above, then rerun this recorder so the report contains the updated command and APK artifact state.
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 13:19 - P1 Local Voice Mode E2E Fix
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-10T05:19:09.252Z
+- Finished: 2026-07-10T05:19:48.471Z
+
+Command results:
+
+- PASS: `pnpm install --frozen-lockfile`
+  - id: `install`, cwd: `.`, duration: 8.2s
+- PASS: `pnpm --filter @slopus/happy-wire build`
+  - id: `wire-build`, cwd: `.`, duration: 3.0s
+- PASS: `pnpm --filter happy-app typecheck`
+  - id: `app-typecheck`, cwd: `.`, duration: 6.3s
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/attachmentSupport.test.ts sources/sync/attachmentDiagnostics.test.ts sources/sync/apiAttachments.test.ts`
+  - id: `attachment-tests`, cwd: `.`, duration: 1.3s
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - id: `app-tests`, cwd: `.`, duration: 3.0s
+- PASS: `./gradlew :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 11.4s
+- PASS: `./gradlew :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 5.4s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 473542106 bytes
+  - mtime: 2026-07-10T05:09:03.707Z
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (pre-existing or unchanged during this run)
+  - size: 304657617 bytes
+  - mtime: 2026-07-10T05:18:58.958Z
+
+Overall result: PASS
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 13:23 - P1 Local Voice Mode E2E Retry
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-10T05:23:54.442Z
+- Finished: 2026-07-10T05:24:31.136Z
+
+Command results:
+
+- PASS: `pnpm install --frozen-lockfile`
+  - id: `install`, cwd: `.`, duration: 6.7s
+- PASS: `pnpm --filter @slopus/happy-wire build`
+  - id: `wire-build`, cwd: `.`, duration: 3.0s
+- PASS: `pnpm --filter happy-app typecheck`
+  - id: `app-typecheck`, cwd: `.`, duration: 5.8s
+- PASS: `pnpm --filter happy-app exec vitest run sources/sync/attachmentSupport.test.ts sources/sync/attachmentDiagnostics.test.ts sources/sync/apiAttachments.test.ts`
+  - id: `attachment-tests`, cwd: `.`, duration: 1.1s
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - id: `app-tests`, cwd: `.`, duration: 3.0s
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 10.9s
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 5.5s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 473542106 bytes
+  - mtime: 2026-07-10T05:09:03.707Z
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (pre-existing or unchanged during this run)
+  - size: 304657617 bytes
+  - mtime: 2026-07-10T05:18:58.958Z
+
+Overall result: PASS
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 13:25 - P1 Local Voice Mode Android Artifact Rebuild
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-10T05:25:31.357Z
+- Finished: 2026-07-10T05:25:50.729Z
+
+Command results:
+
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 11.9s
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 6.4s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (produced this run)
+  - size: 468776760 bytes
+  - mtime: 2026-07-10T05:25:43.027Z
+  - sha256: `a639d85b9c96cbbcc471f5a8d00fbd43631b295e1a94ca530b88a8afff240d60`
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (produced this run)
+  - size: 304657617 bytes
+  - mtime: 2026-07-10T05:25:49.660Z
+  - sha256: `75022fbfc1edd601fc9fbfafe9863b6d758aa480c6b281cb8f626d6a33de13b1`
+
+Overall result: PASS
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-10 13:42 - P1 Local Voice Mode Android Service Follow-up
+
+Initial device validation:
+
+- Automated app/wire/CLI tests, typechecks, and Android APK builds passed.
+- Android 13 target granted microphone permission and launched the app without a fatal exception.
+- `android.speech.action.RECOGNIZE_SPEECH` had no resolvable Activity.
+- The target had no usable default speech recognizer or TTS engine (`tts_default_synth=null`).
+
+Required follow-up:
+
+- Check native speech-recognition and TTS capabilities before starting either operation.
+- Show localized, actionable errors when required Android services are unavailable.
+- Validate the complete logged-in STT -> `voiceMode=true` message -> concise CLI prompt -> agent reply -> TTS flow on a target with both services installed.
+
+Implementation and degradation validation:
+
+- Replaced the unresolvable `RECOGNIZE_SPEECH` Activity launch with `expo-speech-recognition` native service discovery, microphone permission preflight, ordered service fallback, and a 45-second recognition timeout.
+- Added a bounded Android offline-model download flow. A missing locale now remains actionable when the fallback service ends or reports no speech, and an unreturned native download request stops after 120 seconds.
+- Added TTS capability detection through installed voices with a 3-second preflight timeout. Missing STT/TTS services show localized errors and leave text input/output available.
+- The original Android 13 target with no recognizer/TTS now degrades without launching an unresolvable Intent or crashing.
+
+Logged-in Android service E2E:
+
+- Target: Android 14 Google Play arm64 AVD `happy_voice_api34`.
+- App: debug APK installed, temporary Happy account created, and local source CLI paired as machine `d04a7cea-1702-4843-853c-eae0f8064a57`.
+- Services found before the run:
+  - SpeechRecognizer: `com.google.android.as` and `com.google.android.tts`.
+  - TTS: `com.google.android.tts/...GoogleTtsService`.
+- Missing English (US) speech data produced the localized in-app download prompt instead of a silent failure. Android downloaded the 44.26 MB pack; logcat recorded 44,265,129 bytes and `LanguagePack downloaded` at 19:03:53.
+- A deterministic 44.1 kHz mono speech sample was streamed into the AVD microphone after tapping the Session mic button. Android emitted partial/final recognition events and the app sent `Reply briefly voicemail work`.
+- CLI evidence: `/tmp/happy-droid-voice-e2e-play/logs/2026-07-10-18-56-51-pid-2954.log` records `Voice mode prompt applied to current user turn` at line 2002, the recognized text at line 2015, and `"voiceMode": true` at line 2020.
+- The agent reply rendered in the same logged-in Session. Google TTS then logged `Synthesis request`, dispatched the installed Mandarin voice, and completed playback with 661,680 frames delivered at 19:17:06.
+
+Final validation:
+
+- PASS: `pnpm install --frozen-lockfile`
+- PASS: `pnpm --filter happy-app exec vitest run`
+  - 66 files / 739 tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `pnpm --filter happy typecheck`
+- PASS: `pnpm --filter @slopus/happy-wire build`
+- PASS: `pnpm --filter @slopus/happy-wire exec vitest run src/messages.test.ts`
+  - 1 file / 9 tests.
+- PASS: `pnpm --filter happy exec vitest run src/utils/voiceModePrompt.test.ts`
+  - 1 file / 2 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+- PASS: debug and release APK builds; see the `19:20` build record below.
+
+Status: PASS
+
+Post-validation AI review retry (2026-07-11):
+
+- BLOCKED: happy-app currently keeps only one pending local voice request, so a normal send or a later microphone request can discard an earlier voice turn before TTS.
+- BLOCKED: Claude and Codex still use batchable queue insertion for voice messages, so adjacent voice/normal inputs are not proven to remain separate provider turns.
+- BLOCKED: Claude/Codex protocol `turn-start.userLocalId` correlation is not yet guaranteed for each isolated voice request.
+- Required revalidation: consecutive voice requests, voice followed by normal input, busy-agent normal -> voice -> normal ordering, and exact `localId` correlation through provider output to serialized TTS.
+
+Status: BLOCKED pending the retry implementation and validation below.
+
+
+## 2026-07-10 19:20 - P1 Local Voice Mode Android Service Follow-up Build
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-10T11:20:24.355Z
+- Finished: 2026-07-10T11:21:57.610Z
+
+Command results:
+
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 29.0s
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 63.4s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 468973632 bytes
+  - mtime: 2026-07-10T05:55:46.033Z
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (produced this run)
+  - size: 304705121 bytes
+  - mtime: 2026-07-10T11:21:56.761Z
+  - sha256: `3f319c023ffdae71f06cdd55e4f6f856a441216b7cc0d3ca44aa053f77deb78e`
+
+Overall result: PASS
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-11 00:11 - P1 Local Voice Mode Turn Correlation Build
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-10T16:11:34.644Z
+- Finished: 2026-07-10T16:12:33.814Z
+
+Command results:
+
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 11.8s
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleRelease`
+  - id: `android-release-apk`, cwd: `packages/happy-app/android`, duration: 46.4s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 468973632 bytes
+  - mtime: 2026-07-10T15:44:30.500Z
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (produced this run)
+  - size: 304709093 bytes
+  - mtime: 2026-07-10T16:12:32.982Z
+  - sha256: `ee53135513271e4d631594bac5029614b73f7747d67e380a0242442237ddd5b4`
+
+Overall result: PASS
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+
+## 2026-07-11 19:12 - P1 Local Voice Queue Isolation Retry
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-11T11:12:18.224Z
+- Finished: 2026-07-11T11:12:29.890Z
+
+Command results:
+
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 11.0s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 468973632 bytes
+  - mtime: 2026-07-11T10:58:30.364Z
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (pre-existing or unchanged during this run)
+  - size: 304712185 bytes
+  - mtime: 2026-07-10T18:20:52.836Z
+
+Overall result: PASS
+
+Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.
+
+Retry validation summary:
+
+- PASS: happy-app local voice focus suite, 4 files / 26 tests.
+  - Covers FIFO request preservation, two voice turns separated by normal input, exact turn correlation, locale-matched TTS, STT capability handling, and playback failure behavior.
+- PASS: happy-cli cross-runner voice focus suite, 6 files / 62 tests.
+  - Covers normal -> voice -> normal isolation for all five runners, consecutive Claude/Codex voice queue isolation, and Claude/Codex `turn-start.userLocalId` propagation.
+- PASS: happy-app full suite, 67 files / 753 tests.
+- PASS: `pnpm --filter happy-app typecheck` and `pnpm --filter happy typecheck`.
+- PASS: `pnpm --filter @slopus/happy-wire exec vitest run src/messages.test.ts`, 9 tests.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`.
+- PASS: Android debug APK build recorded above.
+- Device boundary: this retry did not repeat microphone audio injection on the AVD. The earlier logged-in Android STT/TTS service run remains the device-level evidence; this retry adds deterministic coverage for the newly fixed multi-request and busy-queue concurrency cases.
+
+Status: PASS for the voice request preservation and Claude/Codex per-turn isolation retry.
+
+## 2026-07-16 - P1 Local Voice Final Review Follow-up
+
+Pre-fix review status: FAIL.
+
+- Codex voice prompting was coupled to the one-time `appendSystemPromptInjected` state, so later or resumed voice turns could miss concise instructions and first-turn voice instructions could persist into later normal turns.
+- App TTS correlation accepted an unassociated later turn when an exact `turn-start.userLocalId` match was absent.
+- Android local voice lifecycle remained embedded in `SessionView`, and a second microphone press could not cancel active recognition.
+
+Required revalidation:
+
+- Directly capture Codex `sendTurnAndWait` prompts for normal -> voice -> normal and resumed -> voice sequences.
+- Prove an unassociated normal turn after voice input remains waiting and is never spoken.
+- Prove a second microphone press cancels STT and unmount cleans up recognition and TTS.
+
+Post-fix result: PASS.
+
+- PASS: Codex prompt tests directly captured normal -> voice -> normal and resumed -> voice `sendTurnAndWait` inputs. Persistent append instructions appeared only when requested; the current-turn voice instruction appeared on every voice turn and no normal turn.
+- PASS: App correlation rejects an unassociated `localId=null` turn after a voice request and remains waiting rather than speaking unrelated text.
+- PASS: the dedicated Android local voice hook cancels recognition on a second microphone press and cancels recognition plus TTS on unmount.
+- PASS: focused App voice suite, 5 files / 30 tests; focused cross-runner CLI suite, 7 files / 70 tests.
+- PASS: happy-app full suite, 68 files / 757 tests; happy-app and happy-cli typechecks; quick validation.
+- PASS: Android debug APK source build, 1215 Gradle tasks, `BUILD SUCCESSFUL` in 10s.
+- PASS: happy-cli unit suite, 76 files / 710 tests. The first run had one unrelated temporary native-version probe timeout; its isolated rerun and the second complete unit run passed without code changes.
+
+
+## 2026-07-11 19:14 - P1 Local Voice Queue Isolation Final Build
+
+Environment:
+
+- Mode: run
+- Platform: darwin arm64
+- Node: v22.19.0
+- pnpm: 10.11.0
+- JAVA_HOME: (unset)
+- Java: java version "1.8.0_381"
+- Android JAVA_HOME: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+- Android Java: openjdk version "17.0.19" 2026-04-21
+- Gradle: Gradle 9.0.0
+- Started: 2026-07-11T11:14:31.141Z
+- Finished: 2026-07-11T11:14:41.929Z
+
+Command results:
+
+- PASS: `./gradlew "-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" :app:assembleDebug`
+  - id: `android-debug-apk`, cwd: `packages/happy-app/android`, duration: 10.1s
+APK artifacts:
+
+- debug: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (pre-existing or unchanged during this run)
+  - size: 468973632 bytes
+  - mtime: 2026-07-11T10:58:30.364Z
+- release: `packages/happy-app/android/app/build/outputs/apk/release/app-release.apk` (pre-existing or unchanged during this run)
+  - size: 304712185 bytes
+  - mtime: 2026-07-10T18:20:52.836Z
+
+Overall result: PASS
 
 Constraint note: this recorder does not change Java, Android SDK, proxy, VPN, Tailscale, or host network settings.

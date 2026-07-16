@@ -5,6 +5,11 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const {
+  androidCommandEnv,
+  androidGradleArgs,
+  resolveAndroidJava,
+} = require('./happy-droid-java.cjs');
 
 const repoRoot = path.resolve(__dirname, '..');
 const defaultReportPath = 'docs/happy-droid/e2e-report.md';
@@ -64,7 +69,7 @@ const commands = [
     group: 'android',
     cwd: 'packages/happy-app/android',
     command: './gradlew',
-    args: [':app:assembleDebug'],
+    args: androidGradleArgs([':app:assembleDebug']),
     description: 'Build a local debug APK.',
   },
   {
@@ -72,7 +77,7 @@ const commands = [
     group: 'android',
     cwd: 'packages/happy-app/android',
     command: './gradlew',
-    args: [':app:assembleRelease'],
+    args: androidGradleArgs([':app:assembleRelease']),
     description: 'Build a local release APK signed with the current local Gradle config.',
   },
 ];
@@ -182,7 +187,8 @@ function selectCommands(options) {
 }
 
 function formatCommand(item) {
-  return `${item.command} ${item.args.join(' ')}`;
+  const args = item.args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg));
+  return [item.command, ...args].join(' ');
 }
 
 function listCommands(selected) {
@@ -194,7 +200,7 @@ function listCommands(selected) {
   }
 }
 
-function runCommand(item) {
+function runCommand(item, androidJava) {
   const startedAt = Date.now();
   const cwd = path.resolve(repoRoot, item.cwd);
   console.log(`\n==> ${item.id}`);
@@ -205,7 +211,7 @@ function runCommand(item) {
     cwd,
     encoding: 'utf8',
     shell: false,
-    env: process.env,
+    env: item.group === 'android' ? androidCommandEnv(process.env, androidJava) : process.env,
     maxBuffer: 1024 * 1024 * 40,
   });
 
@@ -251,23 +257,26 @@ function skippedCommand(item) {
   };
 }
 
-function collectEnvironment() {
+function collectEnvironment(androidJava = resolveAndroidJava()) {
+  const gradleEnv = androidCommandEnv(process.env, androidJava);
   return {
     node: process.version,
     pnpm: runProbe('pnpm', ['-v'], '.'),
     java: runProbe('java', ['-version'], '.'),
     javaHome: process.env.JAVA_HOME || '(unset)',
-    gradle: runProbe('./gradlew', ['--version'], 'packages/happy-app/android'),
+    androidJavaHome: androidJava?.javaHome || '(no JDK 17+ found)',
+    androidJava: androidJava?.version || '(no JDK 17+ found)',
+    gradle: runProbe('./gradlew', ['--version'], 'packages/happy-app/android', gradleEnv),
     platform: `${os.platform()} ${os.arch()}`,
   };
 }
 
-function runProbe(command, args, cwd) {
+function runProbe(command, args, cwd, env = process.env) {
   const result = spawnSync(command, args, {
     cwd: path.resolve(repoRoot, cwd),
     encoding: 'utf8',
     shell: false,
-    env: process.env,
+    env,
     maxBuffer: 1024 * 1024,
   });
   const output = `${result.stdout || ''}${result.stderr || ''}`.trim();
@@ -359,6 +368,8 @@ function buildReport({ title, mode, startedAt, endedAt, environment, results, ar
   lines.push(`- pnpm: ${environment.pnpm}`);
   lines.push(`- JAVA_HOME: ${environment.javaHome}`);
   lines.push(`- Java: ${environment.java}`);
+  lines.push(`- Android JAVA_HOME: ${environment.androidJavaHome}`);
+  lines.push(`- Android Java: ${environment.androidJava}`);
   lines.push(`- Gradle: ${environment.gradle}`);
   lines.push(`- Started: ${startedAt.toISOString()}`);
   lines.push(`- Finished: ${endedAt.toISOString()}`);
@@ -445,10 +456,11 @@ function execute(options) {
 
   const startedAt = new Date();
   const beforeArtifacts = collectArtifactStates();
-  const environment = collectEnvironment();
+  const androidJava = resolveAndroidJava();
+  const environment = collectEnvironment(androidJava);
   const results = options.mode === 'dry-run'
     ? selected.map(skippedCommand)
-    : selected.map(runCommand);
+    : selected.map((item) => runCommand(item, androidJava));
   const afterArtifacts = collectArtifactStates();
   const artifacts = enrichArtifacts(beforeArtifacts, afterArtifacts, results);
   const endedAt = new Date();

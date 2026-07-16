@@ -941,7 +941,8 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                 content: {
                     type: 'text',
                     text: 'User input message'
-                }
+                },
+                localKey: 'stable-local-id'
             };
 
             const result = RawRecordSchema.safeParse(userMessage);
@@ -950,6 +951,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             if (result.success && result.data.role === 'user') {
                 expect(result.data.content.type).toBe('text');
                 expect(result.data.content.text).toBe('User input message');
+                expect(result.data.localKey).toBe('stable-local-id');
             }
         });
     });
@@ -1706,7 +1708,7 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
-        it('maps turn-end to ready event and drops turn-start', () => {
+        it('preserves turn lifecycle boundaries as ready metadata', () => {
             const turnStart = normalizeRawMessage('db-5', null, 1, {
                 ...base,
                 content: {
@@ -1716,11 +1718,18 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                         time: 1,
                         role: 'agent',
                         turn: 'turn-5',
-                        ev: { t: 'turn-start' }
+                        ev: { t: 'turn-start', userLocalId: 'voice-local-id' }
                     }
                 }
             });
-            expect(turnStart).toBeNull();
+            expect(turnStart).toMatchObject({
+                id: 'env-5',
+                role: 'event',
+                content: { type: 'ready' },
+                localId: 'voice-local-id',
+                turnId: 'turn-5',
+                turnStatus: 'started'
+            });
 
             const turnEnd = normalizeRawMessage('db-6', null, 1, {
                 ...base,
@@ -1738,7 +1747,9 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             expect(turnEnd).toMatchObject({
                 id: 'env-6',
                 role: 'event',
-                content: { type: 'ready' }
+                content: { type: 'ready' },
+                turnId: 'turn-5',
+                turnStatus: 'completed'
             });
         });
 

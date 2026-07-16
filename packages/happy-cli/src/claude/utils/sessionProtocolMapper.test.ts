@@ -75,6 +75,18 @@ describe('mapClaudeLogMessageToSessionEnvelopes', () => {
         expect(result.envelopes[2].ev).toEqual({ t: 'text', text: 'internal', thinking: true });
     });
 
+    it('consumes the pending voice localId on turn-start', () => {
+        const state = { currentTurnId: null, pendingUserLocalId: 'voice-local-1' };
+        const result = mapClaudeLogMessageToSessionEnvelopes({
+            type: 'assistant',
+            uuid: 'a-voice',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'Brief reply' }] },
+        } as any, state);
+
+        expect(result.envelopes[0].ev).toEqual({ t: 'turn-start', userLocalId: 'voice-local-1' });
+        expect(state.pendingUserLocalId).toBeUndefined();
+    });
+
     it('maps tool use and tool result blocks to tool-call lifecycle', () => {
         const started = mapClaudeLogMessageToSessionEnvelopes({
             type: 'assistant',

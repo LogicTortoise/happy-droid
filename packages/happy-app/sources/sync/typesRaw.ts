@@ -74,6 +74,7 @@ const sessionFileEventSchema = z.object({
 
 const sessionTurnStartEventSchema = z.object({
     t: z.literal('turn-start'),
+    userLocalId: z.string().min(1).optional(),
 });
 
 const sessionStartEventSchema = z.object({
@@ -445,6 +446,7 @@ const rawRecordSchema = z.preprocess(
                 type: z.literal('text'),
                 text: z.string()
             }),
+            localKey: z.string().optional(),
             meta: MessageMetaSchema.optional()
         }),
         z.object({
@@ -529,6 +531,9 @@ export type NormalizedMessage = ({
     isSidechain: boolean,
     meta?: MessageMeta,
     usage?: UsageData,
+    serverSequence?: number,
+    turnId?: string,
+    turnStatus?: 'started' | 'completed' | 'failed' | 'cancelled',
     /**
      * Underlying Claude `uuid` for this message — used as the rewind point
      * for the session fork / duplicate flow. Optional because some message
@@ -539,6 +544,22 @@ export type NormalizedMessage = ({
 };
 
 function normalizeSessionEnvelope(
+    envelope: SessionEnvelope,
+    localId: string | null,
+    createdAt: number,
+    meta: MessageMeta | undefined,
+): NormalizedMessage | null {
+    const normalized = normalizeSessionEnvelopeBody(envelope, localId, createdAt, meta);
+    if (!normalized) {
+        return null;
+    }
+    return {
+        ...normalized,
+        ...(envelope.turn ? { turnId: envelope.turn } : {}),
+    };
+}
+
+function normalizeSessionEnvelopeBody(
     envelope: SessionEnvelope,
     localId: string | null,
     createdAt: number,
@@ -557,7 +578,16 @@ function normalizeSessionEnvelope(
     const contentUUID = envelope.id;
 
     if (envelope.ev.t === 'turn-start') {
-        return null;
+        return {
+            id: messageId,
+            localId: envelope.ev.userLocalId ?? localId,
+            createdAt: messageCreatedAt,
+            role: 'event',
+            isSidechain: false,
+            content: { type: 'ready' },
+            turnStatus: 'started',
+            meta,
+        } satisfies NormalizedMessage;
     }
 
     if (envelope.ev.t === 'start' || envelope.ev.t === 'stop') {
@@ -573,6 +603,7 @@ function normalizeSessionEnvelope(
             role: 'event',
             isSidechain: false,
             content: { type: 'ready' },
+            turnStatus: envelope.ev.status,
             meta
         } satisfies NormalizedMessage;
     }
@@ -737,7 +768,20 @@ function normalizeSessionEnvelope(
     return null;
 }
 
-export function normalizeRawMessage(id: string, localId: string | null, createdAt: number, raw: RawRecord): NormalizedMessage | null {
+export function normalizeRawMessage(
+    id: string,
+    localId: string | null,
+    createdAt: number,
+    raw: RawRecord,
+    serverSequence?: number | null,
+): NormalizedMessage | null {
+    const normalized = normalizeRawMessageWithoutSequence(id, localId, createdAt, raw);
+    return normalized && serverSequence != null
+        ? { ...normalized, serverSequence }
+        : normalized;
+}
+
+function normalizeRawMessageWithoutSequence(id: string, localId: string | null, createdAt: number, raw: RawRecord): NormalizedMessage | null {
     // Zod transform handles normalization during validation
     let parsed = rawRecordSchema.safeParse(raw);
     if (!parsed.success) {

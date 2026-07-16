@@ -76,3 +76,6 @@ happy-workspaces/
 
 # third party tools
 .supervibe/
+
+# Supervisor worker output is local process state, not project source.
+.supervisor/*.stream.log

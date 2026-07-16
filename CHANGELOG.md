@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added resilient local Android voice mode with cancellable STT, isolated per-turn concise prompting across all runners, strictly correlated locale-aware TTS, localized fallback, and deterministic verification.
 - Aligned happy-app custom instructions with Telegram-style button questions using native AskUserQuestion rendering.
 - Added stable localId confirmation and localized recovery prompts for app-created session first-message retries.
 - Hardened happy-app-created session first-message submission with persisted retry/discard recovery and outbox commit checks.

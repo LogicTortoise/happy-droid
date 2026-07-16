@@ -25,6 +25,15 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
         expect(ended.currentTurnId).toBeNull();
     });
 
+    it('associates task_started with the pending voice localId', () => {
+        const started = mapCodexMcpMessageToSessionEnvelopes(
+            { type: 'task_started' },
+            { currentTurnId: null, pendingUserLocalId: 'voice-local-2' },
+        );
+
+        expect(started.envelopes[0].ev).toEqual({ t: 'turn-start', userLocalId: 'voice-local-2' });
+    });
+
     it('maps abort lifecycle with cancelled turn-end status', () => {
         const result = mapCodexMcpMessageToSessionEnvelopes(
             { type: 'turn_aborted' },

@@ -89,6 +89,36 @@ describe('reducer', () => {
             expect(result2.messages).toHaveLength(0);
         });
 
+        it('backfills the server sequence when an optimistic localId is acknowledged', () => {
+            const state = createReducer();
+            reducer(state, [{
+                id: 'local123',
+                localId: 'local123',
+                createdAt: 9000,
+                role: 'user',
+                content: { type: 'text', text: 'Voice prompt' },
+                isSidechain: false
+            }]);
+
+            const result = reducer(state, [{
+                id: 'server-message-1',
+                localId: 'local123',
+                createdAt: 1000,
+                role: 'user',
+                content: { type: 'text', text: 'Voice prompt' },
+                isSidechain: false,
+                serverSequence: 41
+            }]);
+
+            expect(result.messages).toEqual([
+                expect.objectContaining({
+                    kind: 'user-text',
+                    localId: 'local123',
+                    serverSequence: 41
+                })
+            ]);
+        });
+
         it('should deduplicate user messages by message id when no localId', () => {
             const state = createReducer();
             
@@ -2931,6 +2961,31 @@ describe('reducer', () => {
             }]);
 
             expect(result.messages).toHaveLength(0);
+        });
+
+        it('retains protocol turn lifecycle metadata for non-visual consumers', () => {
+            const state = createReducer();
+            const result = reducer(state, [{
+                id: 'turn-end-1',
+                localId: null,
+                createdAt: 1000,
+                role: 'event',
+                content: { type: 'ready' },
+                isSidechain: false,
+                serverSequence: 23,
+                turnId: 'turn-1',
+                turnStatus: 'completed'
+            }]);
+
+            expect(result.messages).toEqual([
+                expect.objectContaining({
+                    kind: 'agent-event',
+                    serverSequence: 23,
+                    turnId: 'turn-1',
+                    turnStatus: 'completed'
+                })
+            ]);
+            expect(result.hasReadyEvent).toBe(true);
         });
 
         it('nests subagent-linked sidechain messages under parent tool calls', () => {

@@ -11,6 +11,7 @@ import { EnhancedMode, PermissionMode } from './loop';
 import { MessageQueue2 } from '@/utils/MessageQueue2';
 import { hashObject } from '@/utils/deterministicJson';
 import { parseSpecialCommand } from '@/parsers/specialCommands';
+import { enqueueVoiceModePrompt, resolveVoiceModePromptForRunner } from '@/utils/voiceModePrompt';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { configuration } from '@/configuration';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
@@ -709,6 +710,15 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         } else {
             logger.debug(`[loop] User message received with no append system prompt override, using current: ${currentAppendSystemPrompt ? 'set' : 'none'}`);
         }
+        if (message.meta?.voiceMode) {
+            messageAppendSystemPrompt = resolveVoiceModePromptForRunner({
+                runner: 'claude',
+                message: message.content.text,
+                appendSystemPrompt: messageAppendSystemPrompt,
+                voiceMode: true,
+            }).appendSystemPrompt;
+            logger.debug('[loop] Voice mode prompt applied to current user turn');
+        }
 
         // Resolve allowed tools - use message.meta.allowedTools if provided, otherwise use current
         let messageAllowedTools = currentAllowedTools;
@@ -752,19 +762,31 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             logger.debug(`[loop] User message received with no effort override, using current: ${currentEffort ?? 'default'}`);
         }
 
+        const messageEnhancedMode: EnhancedMode = {
+            permissionMode: messagePermissionMode || 'default',
+            model: messageModel,
+            fallbackModel: messageFallbackModel,
+            customSystemPrompt: messageCustomSystemPrompt,
+            appendSystemPrompt: messageAppendSystemPrompt,
+            allowedTools: messageAllowedTools,
+            disallowedTools: messageDisallowedTools,
+            effort: messageEffort,
+            ...(message.meta?.voiceMode && message.localKey ? { voiceLocalId: message.localKey } : {}),
+        };
+
         // Check for special commands before processing
         const specialCommand = parseSpecialCommand(message.content.text);
 
         if (specialCommand.type === 'compact') {
             logger.debug('[start] Detected /compact command');
-            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || message.content.text, currentEnhancedMode(), attachmentsForThisMessage);
+            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || message.content.text, messageEnhancedMode, attachmentsForThisMessage);
             logger.debugLargeJson('[start] /compact command pushed to queue:', message);
             return;
         }
 
         if (specialCommand.type === 'clear') {
             logger.debug('[start] Detected /clear command');
-            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || message.content.text, currentEnhancedMode(), attachmentsForThisMessage);
+            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || message.content.text, messageEnhancedMode, attachmentsForThisMessage);
             logger.debugLargeJson('[start] /clear command pushed to queue:', message);
             return;
         }
@@ -812,7 +834,13 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         }
 
         // Push with resolved permission mode, model, system prompts, and tools
-        messageQueue.push(message.content.text, currentEnhancedMode(), attachmentsForThisMessage);
+        enqueueVoiceModePrompt({
+            queue: messageQueue,
+            message: message.content.text,
+            mode: messageEnhancedMode,
+            voiceMode: message.meta?.voiceMode,
+            attachments: attachmentsForThisMessage,
+        });
         logger.debugLargeJson('User message pushed to queue:', message)
     });
 

@@ -1,11 +1,15 @@
 # Voice Architecture
 
-How the ElevenLabs voice assistant integrates with the Happy app, routes messages to sessions, and manages context delivery.
+How Happy's ElevenLabs assistant and local Android voice mode route speech through sessions.
 
 ## Components
 
 ```text
-SessionView.tsx            UI — mic button, triggers voice start/stop
+SessionView.tsx            UI - mic button; selects local Android or ElevenLabs flow
+useLocalAndroidVoiceMode.ts  Local Android lifecycle - cancellation, FIFO requests, correlation, TTS, cleanup
+androidSpeechRecognition.ts  Android STT capability, locale, model, and recognition lifecycle
+localVoiceMode.ts          Local voice turn correlation and reply aggregation
+localTextToSpeech.ts       Android TTS capability and locale-matched voice selection
 RealtimeSession.ts         Lifecycle — start/stop, token fetch, session routing state
 RealtimeVoiceSession.tsx   Native ElevenLabs bridge (useConversation hook)
 RealtimeVoiceSession.web.tsx  Web ElevenLabs bridge (same interface)
@@ -16,6 +20,38 @@ voiceConfig.ts             Feature flags and constants
 storage.ts                 Global state (realtimeStatus, realtimeMode)
 types.ts                   Shared type definitions
 ```
+
+## Local Android Voice Mode
+
+Android uses the Session microphone as a local STT -> Happy message -> agent -> local TTS path. It does not create an ElevenLabs realtime session.
+
+```text
+User taps Session mic
+  -> dedicated hook verifies SpeechRecognizer service, permission, and locale model
+  -> recognize transcript and retain recognition locale
+  -> sync.sendMessage(..., stableLocalId, { voiceMode: true })
+  -> encrypted user payload carries the stable id as localKey
+  -> CLI runner isolates the voice queue item and applies the shared concise instruction
+  -> runner emits turn-start(localKey), text, and terminal turn-end envelopes
+  -> app resolves the user localId to that exact protocol turn
+  -> aggregate agent text for that turn until its terminal turn event
+  -> select an installed TTS voice matching the recognition locale
+  -> speak once, then close local voice state
+```
+
+All supported CLI runners reachable from the Session microphone consume `voiceMode`: Claude, Codex, Gemini, OpenClaw, and ACP. The instruction is scoped to the current user turn and asks for a concise, speech-friendly response. Codex injects that instruction into each applicable `sendTurnAndWait` prompt independently of its one-time persistent Happy preamble. Every runner queues voice input as an isolated item so adjacent normal prompts and consecutive voice prompts remain separate provider turns without being discarded.
+
+### Reply Correlation
+
+The originating user message `localId` is the correlation key. The app sends it as the existing wire `localKey`; runners that embed the voice prompt copy it onto the protocol `turn-start` event. The app accepts only an exact `turn-start.userLocalId` match and does not fall back to unassociated or legacy turns. Missing correlation remains waiting and cannot trigger TTS. Only agent text from the matched turn is eligible for TTS. The app waits for the matching terminal turn event, combines text chunks in message order, and ignores client/server clock values, concurrent turns, and later asynchronous messages. Pending local voice requests remain independent when normal or later voice input arrives, and completed replies are spoken serially in request order.
+
+### Lifecycle Ownership
+
+`useLocalAndroidVoiceMode` owns the active recognition handle, pending request FIFO, TTS playback, and cleanup. Pressing the active Android microphone cancels recognition immediately. Unmount cancels recognition and stops playback so `SessionView` only routes the microphone action and renders active state.
+
+### TTS Selection And Failure
+
+The recognition locale is passed to TTS. Voice selection prefers an exact locale and then the same base language; an unrelated installed voice is not considered a valid fallback. Capability checks and failures from voice discovery, `stop()`, or `speak()` surface the localized TTS-unavailable message while leaving the agent reply visible.
 
 ## Session Routing
 
@@ -152,7 +188,7 @@ App mounts RealtimeVoiceSession component
   └──> useConversation() hook initializes
   └──> registerVoiceSession(impl) — makes the instance available globally
 
-User taps mic
+User taps ElevenLabs mic on a non-local-Android flow
   └──> voiceHooks.onVoiceStarted(sessionId) — builds initial prompt
   └──> startRealtimeSession(sessionId, prompt)
          ├──> fetchVoiceToken() — server-side gating (see plans/elevenlabs-voice-usage-gating.md)

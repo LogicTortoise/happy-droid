@@ -8,6 +8,7 @@ import {
 
 export type ClaudeSessionProtocolState = {
     currentTurnId: string | null;
+    pendingUserLocalId?: string;
     uuidToProviderSubagent?: Map<string, string>;
     taskPromptToSubagents?: Map<string, string[]>;
     providerSubagentToSessionSubagent?: Map<string, string>;
@@ -381,7 +382,11 @@ function ensureTurn(state: ClaudeSessionProtocolState, envelopes: SessionEnvelop
     }
 
     const turnId = createId();
-    envelopes.push(createEnvelope('agent', { t: 'turn-start' }, { turn: turnId }));
+    envelopes.push(createEnvelope('agent', {
+        t: 'turn-start',
+        ...(state.pendingUserLocalId ? { userLocalId: state.pendingUserLocalId } : {}),
+    }, { turn: turnId }));
+    state.pendingUserLocalId = undefined;
     state.currentTurnId = turnId;
     return turnId;
 }

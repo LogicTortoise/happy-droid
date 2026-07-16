@@ -1,6 +1,7 @@
 import type { PermissionMode } from '@/api/types';
 import { CHANGE_TITLE_INSTRUCTION } from '@/gemini/constants';
 import { hashObject } from '@/utils/deterministicJson';
+import { VOICE_MODE_APPEND_SYSTEM_PROMPT } from '@/utils/voiceModePrompt';
 
 import type { ReasoningEffort } from './codexAppServerTypes';
 
@@ -11,6 +12,10 @@ export interface CodexEnhancedMode {
     appendSystemPrompt?: string;
     /** Reasoning effort passed through to Codex's sendTurnAndWait. */
     effort?: ReasoningEffort;
+    /** Correlates an isolated app voice prompt with its protocol turn. */
+    voiceLocalId?: string;
+    /** Applies concise spoken-response instructions to this turn only. */
+    voiceMode?: boolean;
 }
 
 export function hashCodexEnhancedMode(mode: CodexEnhancedMode): string {
@@ -19,12 +24,13 @@ export function hashCodexEnhancedMode(mode: CodexEnhancedMode): string {
         model: mode.model,
         appendSystemPrompt: mode.appendSystemPrompt,
         effort: mode.effort,
+        voiceMode: mode.voiceMode,
     });
 }
 
 export function buildCodexTurnPrompt(opts: {
     message: string;
-    mode: Pick<CodexEnhancedMode, 'appendSystemPrompt'>;
+    mode: Pick<CodexEnhancedMode, 'appendSystemPrompt' | 'voiceMode'>;
     includeAppendSystemPrompt: boolean;
     includeTitleInstruction: boolean;
 }): string {
@@ -34,6 +40,10 @@ export function buildCodexTurnPrompt(opts: {
         parts.push(opts.mode.appendSystemPrompt);
     }
 
+    if (opts.mode.voiceMode) {
+        parts.push(VOICE_MODE_APPEND_SYSTEM_PROMPT);
+    }
+
     parts.push(opts.message);
 
     if (opts.includeTitleInstruction) {
@@ -41,4 +51,21 @@ export function buildCodexTurnPrompt(opts: {
     }
 
     return parts.join('\n\n');
+}
+
+export async function sendCodexTurnWithPrompt<TOptions, TResult>(opts: {
+    sender: { sendTurnAndWait(prompt: string, options: TOptions): Promise<TResult> };
+    message: string;
+    mode: Pick<CodexEnhancedMode, 'appendSystemPrompt' | 'voiceMode'>;
+    includeAppendSystemPrompt: boolean;
+    includeTitleInstruction: boolean;
+    turnOptions: TOptions;
+}): Promise<TResult> {
+    const prompt = buildCodexTurnPrompt({
+        message: opts.message,
+        mode: opts.mode,
+        includeAppendSystemPrompt: opts.includeAppendSystemPrompt,
+        includeTitleInstruction: opts.includeTitleInstruction,
+    });
+    return await opts.sender.sendTurnAndWait(prompt, opts.turnOptions);
 }

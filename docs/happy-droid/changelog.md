@@ -57,3 +57,20 @@
 - Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
 - Read-only reference: `/Users/Hht/Documents/10.github/happy-telegram` uses appended instructions to require button-style user questions, with Telegram rendering handled by `ask_user_question`; happy-app will align on the supported native `AskUserQuestion` path and existing app tool rendering rather than Telegram-only MCP tools.
 - Planned coverage: app append-system-prompt contents, send metadata propagation, AskUserQuestion input compatibility, focused prompt/render tests, happy-app typecheck, quick/app validation, and Android build environment record if needed.
+
+## 2026-07-10 - Local Voice Mode
+
+- Started P1 work to land local voice mode in happy-app without the remote ElevenLabs conversation path.
+- Pre-read gap remains: `SUPERVISOR_TASK.md` and `.supervisor/outline.md` are absent in this checkout.
+- Planned coverage: Android STT input entry, local TTS reading of agent replies, `voiceMode` message metadata through app/wire/CLI schemas, concise generation prompt handling, focused unit tests, happy-app typecheck, quick/app validation, and Android build environment record.
+- Implemented Android speech-recognition input on the Session mic button, local TTS playback for agent replies after voice prompts, `voiceMode` metadata across app/wire/CLI schemas, and per-turn concise spoken-response prompt handling for Claude/Codex.
+- Validation: focused app/wire/CLI tests, happy-app typecheck, and quick/app validation groups passed; initial Android attempts exposed Java 8 and release packaging memory failures, both retained in `docs/happy-droid/e2e-report.md`.
+- E2E fix: validation/report helpers now select an already-installed JDK 17+ for Android subprocesses and pass reproducible 6 GiB heap/1 GiB metaspace limits to Gradle without changing host Java or ignored native-project settings.
+- Final E2E: the full quick/app/android recorder exited 0, all 729 happy-app tests passed, and both debug and release APK builds passed.
+- Android service follow-up: replace the unresolvable speech Activity path with native recognition-service capability checks, add a bounded offline-model download flow, gate local TTS on installed voices, surface localized missing-service errors, and rerun the logged-in STT-to-message-to-TTS device flow.
+- AI review follow-up: align `voiceMode` across every supported runner, correlate TTS to the originating user `localId` and completed protocol turn, select a locale-matched TTS voice, and synchronize the voice/wire specifications.
+- AI review follow-up: Gemini still needs protocol turn lifecycle output, Gemini/OpenClaw/ACP must isolate voice messages from adjacent queued input, and the Android offline-model dialog result must not be reported as ready.
+- Implemented Gemini protocol lifecycle output, stable voice-turn `localKey` correlation, isolated Gemini/OpenClaw/ACP voice queue items, and distinct Android model-dialog guidance with cross-runner integration coverage.
+- E2E baseline follow-up: pin the Ink-compatible `signal-exit` major for happy-cli unit tests and ignore supervisor worker stream logs so verification starts from a clean worktree.
+- AI review retry: preserve every pending App voice request independently when normal or later voice input arrives, and isolate Claude/Codex voice queue items so each `localId` maps to exactly one protocol/provider turn.
+- Final review follow-up: scope Codex voice instructions to each `sendTurnAndWait`, require exact `turn-start.userLocalId` correlation with no legacy fallback, and move cancellable Android STT/TTS lifecycle ownership into a dedicated hook.

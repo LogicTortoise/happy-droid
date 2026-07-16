@@ -1,6 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { createEnvelope, type CreateEnvelopeOptions, type SessionEnvelope } from '@slopus/happy-wire';
-import type { AgentMessage } from '@/agent/core';
+import type { AgentMessage } from '../core';
 
 function turnOptions(turnId: string | null, time: number): CreateEnvelopeOptions {
   return turnId ? { turn: turnId, time } : { time };
@@ -73,7 +73,7 @@ export class AcpSessionManager {
     return [createEnvelope('agent', { t: 'text', text }, turnOptions(this.currentTurnId, this.nextTime()))];
   }
 
-  startTurn(): SessionEnvelope[] {
+  startTurn(userLocalId?: string): SessionEnvelope[] {
     if (this.currentTurnId) {
       return [];
     }
@@ -81,7 +81,10 @@ export class AcpSessionManager {
     this.currentTurnId = createId();
     this.acpCallToSessionCall.clear();
     return [
-      createEnvelope('agent', { t: 'turn-start' }, { turn: this.currentTurnId, time: this.nextTime() }),
+      createEnvelope('agent', {
+        t: 'turn-start',
+        ...(userLocalId ? { userLocalId } : {}),
+      }, { turn: this.currentTurnId, time: this.nextTime() }),
     ];
   }
 

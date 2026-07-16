@@ -256,8 +256,11 @@ Notes:
   allowedTools?: string[] | null;
   disallowedTools?: string[] | null;
   displayText?: string;
+  voiceMode?: boolean;
 }
 ```
+
+`voiceMode` marks a user message created by local speech input. Agent runners use it to apply the shared concise, speech-friendly response instruction to that turn. It does not replace the user-visible transcript.
 
 ## Legacy Decrypted Payload Specs (`legacyProtocol.ts`)
 
@@ -484,8 +487,11 @@ Role meaning:
 ```ts
 {
   t: 'turn-start';
+  userLocalId?: string;
 }
 ```
+
+`userLocalId` associates an isolated provider turn with the originating user message when a stable local key is available.
 
 ### 7) Start event
 
@@ -656,7 +662,8 @@ Output:
   "role": "agent",
   "turn": "turn-42",
   "ev": {
-    "t": "turn-start"
+    "t": "turn-start",
+    "userLocalId": "voice-local-id"
   }
 }
 ```

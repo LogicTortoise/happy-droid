@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
 const { spawnSync } = require('node:child_process');
+const {
+  androidCommandEnv,
+  androidGradleArgs,
+  resolveAndroidJava,
+} = require('./happy-droid-java.cjs');
 
 const commands = [
   {
@@ -49,7 +54,11 @@ const commands = [
     group: 'quick',
     cwd: '.',
     command: 'node',
-    args: ['--test', 'scripts/happy-droid-e2e-record.test.cjs'],
+    args: [
+      '--test',
+      'scripts/happy-droid-java.test.cjs',
+      'scripts/happy-droid-e2e-record.test.cjs',
+    ],
     description: 'Run focused tests for the Android/E2E report recorder.',
   },
   {
@@ -65,7 +74,7 @@ const commands = [
     group: 'android',
     cwd: 'packages/happy-app/android',
     command: './gradlew',
-    args: [':app:assembleDebug'],
+    args: androidGradleArgs([':app:assembleDebug']),
     description: 'Build a local debug APK.',
   },
   {
@@ -73,7 +82,7 @@ const commands = [
     group: 'android',
     cwd: 'packages/happy-app/android',
     command: './gradlew',
-    args: [':app:assembleRelease'],
+    args: androidGradleArgs([':app:assembleRelease']),
     description: 'Build a local release APK signed with the current local Gradle config.',
   },
 ];
@@ -130,7 +139,8 @@ function selectCommands(options) {
 }
 
 function formatCommand(item) {
-  return `${item.command} ${item.args.join(' ')}`;
+  const args = item.args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg));
+  return [item.command, ...args].join(' ');
 }
 
 function list(selected) {
@@ -143,6 +153,7 @@ function list(selected) {
 }
 
 function run(selected) {
+  const androidJava = resolveAndroidJava();
   for (const item of selected) {
     console.log(`\n==> ${item.id}`);
     console.log(`cwd: ${item.cwd}`);
@@ -151,7 +162,7 @@ function run(selected) {
       cwd: item.cwd,
       stdio: 'inherit',
       shell: false,
-      env: process.env,
+      env: item.group === 'android' ? androidCommandEnv(process.env, androidJava) : process.env,
     });
     if (result.status !== 0) {
       const code = result.status === null ? 1 : result.status;

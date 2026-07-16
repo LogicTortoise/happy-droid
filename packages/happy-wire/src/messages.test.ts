@@ -128,12 +128,16 @@ describe('shared wire message schemas', () => {
         type: 'text',
         text: 'fix this test',
       },
+      localKey: 'voice-local-id',
       meta: {
         sentFrom: 'mobile',
+        voiceMode: true,
       },
     });
 
     expect(parsed.success).toBe(true);
+    expect(parsed.success ? parsed.data.meta?.voiceMode : false).toBe(true);
+    expect(parsed.success ? parsed.data.localKey : undefined).toBe('voice-local-id');
   });
 
   it('parses legacy decrypted agent message payload', () => {

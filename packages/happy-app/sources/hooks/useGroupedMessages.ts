@@ -304,6 +304,9 @@ function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseC
 
 /** Returns true for messages that render as null and should be excluded entirely */
 function isInvisibleMessage(msg: Message): boolean {
+    if (msg.kind === 'agent-event' && msg.event.type === 'ready') {
+        return true;
+    }
     // Hidden tools (ToolSearch, CodexReasoning, etc.)
     if (msg.kind === 'tool-call') {
         const known = knownTools[msg.tool.name as keyof typeof knownTools] as any;
