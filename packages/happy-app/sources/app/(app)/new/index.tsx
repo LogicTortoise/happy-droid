@@ -61,10 +61,12 @@ import { getNewSessionSidebarLayout } from '@/utils/newSessionSidebarLayout';
 import { getAgentPickerItems, getModePickerItems } from '@/utils/newSessionPickerItems';
 import { resolveAgentDefaultConfig } from '@/sync/agentDefaults';
 import {
-    createPendingNewSessionSubmission,
-    describePendingSubmissionFailure,
     resolveNewSessionSubmissionPlan,
 } from '@/utils/newSessionSubmissionRecovery';
+import {
+    runNewSessionInitialPromptSubmission,
+    runNewSessionSubmissionLifecycle,
+} from '@/utils/newSessionSubmissionLifecycle';
 
 // Agent icon assets
 const agentIcons = {
@@ -932,61 +934,32 @@ function NewSessionScreen() {
     }, []);
 
     const submitInitialPromptForSession = React.useCallback(async (sessionId: string, prompt: string, existingLocalId?: string): Promise<boolean> => {
-        const pending = createPendingNewSessionSubmission(sessionId, prompt, { localId: existingLocalId ?? randomUUID() });
         const draftState = useNewSessionDraft.getState();
-        if (!pending) {
-            draftState.clearPendingSubmission();
-            draftState.setInput('');
-            return true;
-        }
-
-        draftState.setPendingSubmission(pending);
-        try {
-            await sync.refreshSessions();
-            if (await confirmInitialPromptSubmitted(sessionId, pending.localId)) {
-                draftState.clearPendingSubmission();
-                draftState.setInput('');
-                return true;
-            }
-
-            const sendResult = await sync.sendMessage(sessionId, pending.prompt, {
-                source: 'new_session',
-                localId: pending.localId,
-            });
-            if (!sendResult.queued) {
-                throw new Error(t('newSession.initialMessageNotReady'));
-            }
-            const committed = await sync.waitForOutboxFlush(sessionId, INITIAL_MESSAGE_COMMIT_TIMEOUT_MS);
-            if (!committed && !(await confirmInitialPromptSubmitted(sessionId, pending.localId))) {
-                sync.cancelPendingOutboxForSession(
-                    sessionId,
-                    t('newSession.initialMessageCancelEvent'),
+        return runNewSessionInitialPromptSubmission({
+            sessionId,
+            prompt,
+            localId: existingLocalId ?? randomUUID(),
+            commitTimeoutMs: INITIAL_MESSAGE_COMMIT_TIMEOUT_MS,
+            messages: {
+                notReady: t('newSession.initialMessageNotReady'),
+                cancelEvent: t('newSession.initialMessageCancelEvent'),
+                timeout: t('newSession.initialMessageTimeout'),
+            },
+            refreshSessions: () => sync.refreshSessions(),
+            confirmSubmitted: confirmInitialPromptSubmitted,
+            sendMessage: (targetSessionId, message, options) => sync.sendMessage(targetSessionId, message, options),
+            waitForOutboxFlush: (targetSessionId, timeoutMs) => sync.waitForOutboxFlush(targetSessionId, timeoutMs),
+            cancelPendingOutbox: (targetSessionId, reason) => sync.cancelPendingOutboxForSession(targetSessionId, reason),
+            setPendingSubmission: draftState.setPendingSubmission,
+            clearPendingSubmission: draftState.clearPendingSubmission,
+            setInput: draftState.setInput,
+            onFailure: (message) => {
+                Modal.alert(
+                    t('common.error'),
+                    t('newSession.initialMessageRecoveryMessage', { message }),
                 );
-                throw new Error(t('newSession.initialMessageTimeout'));
-            }
-            draftState.clearPendingSubmission();
-            draftState.setInput('');
-            return true;
-        } catch (error) {
-            if (await confirmInitialPromptSubmitted(sessionId, pending.localId)) {
-                draftState.clearPendingSubmission();
-                draftState.setInput('');
-                return true;
-            }
-
-            const message = describePendingSubmissionFailure(error);
-            draftState.setPendingSubmission({
-                ...pending,
-                status: 'failed',
-                lastError: message,
-            });
-            draftState.setInput(pending.prompt);
-            Modal.alert(
-                t('common.error'),
-                t('newSession.initialMessageRecoveryMessage', { message }),
-            );
-            return false;
-        }
+            },
+        });
     }, [confirmInitialPromptSubmitted]);
 
     // Spawn session handler
@@ -1053,83 +1026,72 @@ function NewSessionScreen() {
             return;
         }
 
-        setIsSpawning(true);
-        try {
-            const pathToUse = trimPathInput(selectedPath) || '~';
-            const absolutePath = resolveAbsolutePath(pathToUse, selectedMachine.metadata?.homeDir);
+        await runNewSessionSubmissionLifecycle({
+            setLoading: setIsSpawning,
+            spawn: async () => {
+                const pathToUse = trimPathInput(selectedPath) || '~';
+                const absolutePath = resolveAbsolutePath(pathToUse, selectedMachine.metadata?.homeDir);
 
-            // Handle worktree selection
-            let spawnDirectory = absolutePath;
-            if (worktreeKey === '__new__') {
-                const worktreeResult = await createWorktree(selectedMachineId, absolutePath);
-                if (!worktreeResult.success) {
-                    Modal.alert(t('common.error'), worktreeResult.error || 'Failed to create worktree');
-                    return;
-                }
-                spawnDirectory = worktreeResult.worktreePath;
-            } else if (worktreeKey !== '__none__') {
-                // Existing worktree — use its path directly
-                spawnDirectory = worktreeKey;
-            }
-
-            const result = await machineSpawnNewSession({
-                machineId: selectedMachineId,
-                directory: spawnDirectory,
-                approvedNewDirectoryCreation,
-                agent: selectedAgent,
-            });
-
-            switch (result.type) {
-                case 'success':
-                    await sync.refreshSessions();
-
-                    // Store only per-session overrides. Matching the effective
-                    // default stays null so future code default changes apply.
-                    const permissionOverride = currentPermission.key === effectiveAgentDefaults.permissionMode
-                        ? null
-                        : currentPermission.key;
-                    const modelOverride = currentModelKey === effectiveAgentDefaults.modelMode
-                        ? null
-                        : currentModelKey;
-                    const currentEffortKey = currentEffort?.key ?? null;
-                    const effortOverride = currentEffortKey === effectiveAgentDefaults.effortLevel
-                        ? null
-                        : currentEffortKey;
-                    storage.getState().updateSessionPermissionMode(result.sessionId, permissionOverride);
-                    storage.getState().updateSessionModelMode(result.sessionId, modelOverride);
-                    storage.getState().updateSessionEffortLevel(result.sessionId, effortOverride);
-
-                    const submitted = await submitInitialPromptForSession(result.sessionId, submissionPlan.prompt);
-                    if (!submitted) {
-                        return;
+                let spawnDirectory = absolutePath;
+                if (worktreeKey === '__new__') {
+                    const worktreeResult = await createWorktree(selectedMachineId, absolutePath);
+                    if (!worktreeResult.success) {
+                        return {
+                            type: 'error',
+                            errorMessage: worktreeResult.error || 'Failed to create worktree',
+                        };
                     }
-
-                    router.back();
-                    navigateToSession(result.sessionId);
-                    break;
-                case 'requestToApproveDirectoryCreation': {
-                    const approved = await Modal.confirm(
-                        'Create Directory?',
-                        `The directory '${result.directory}' does not exist. Would you like to create it?`,
-                        { cancelText: t('common.cancel'), confirmText: t('common.create') },
-                    );
-                    if (approved) {
-                        await handleSend(true);
-                    }
-                    break;
+                    spawnDirectory = worktreeResult.worktreePath;
+                } else if (worktreeKey !== '__none__') {
+                    spawnDirectory = worktreeKey;
                 }
-                case 'error':
-                    Modal.alert(t('common.error'), result.errorMessage);
-                    break;
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error
-                ? error.message
-                : 'Failed to start session';
-            Modal.alert(t('common.error'), errorMessage);
-        } finally {
-            setIsSpawning(false);
-        }
+
+                return machineSpawnNewSession({
+                    machineId: selectedMachineId,
+                    directory: spawnDirectory,
+                    approvedNewDirectoryCreation,
+                    agent: selectedAgent,
+                });
+            },
+            prepareSpawnedSession: async (sessionId) => {
+                await sync.refreshSessions();
+
+                // Store only per-session overrides. Matching the effective
+                // default stays null so future code default changes apply.
+                const permissionOverride = currentPermission.key === effectiveAgentDefaults.permissionMode
+                    ? null
+                    : currentPermission.key;
+                const modelOverride = currentModelKey === effectiveAgentDefaults.modelMode
+                    ? null
+                    : currentModelKey;
+                const currentEffortKey = currentEffort?.key ?? null;
+                const effortOverride = currentEffortKey === effectiveAgentDefaults.effortLevel
+                    ? null
+                    : currentEffortKey;
+                storage.getState().updateSessionPermissionMode(sessionId, permissionOverride);
+                storage.getState().updateSessionModelMode(sessionId, modelOverride);
+                storage.getState().updateSessionEffortLevel(sessionId, effortOverride);
+            },
+            submitInitialPrompt: (sessionId) => submitInitialPromptForSession(sessionId, submissionPlan.prompt),
+            onSuccess: (sessionId) => {
+                router.back();
+                navigateToSession(sessionId);
+            },
+            onDirectoryApproval: async (directory) => {
+                const approved = await Modal.confirm(
+                    'Create Directory?',
+                    `The directory '${directory}' does not exist. Would you like to create it?`,
+                    { cancelText: t('common.cancel'), confirmText: t('common.create') },
+                );
+                if (approved) {
+                    await handleSend(true);
+                }
+            },
+            onError: (message) => {
+                Modal.alert(t('common.error'), message);
+            },
+            fallbackErrorMessage: 'Failed to start session',
+        });
     }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.effortLevel, worktreeKey, submitInitialPromptForSession]);
 
     const canSpawnNewSession = Boolean(selectedMachineId && selectedMachine && isMachineOnline(selectedMachine));

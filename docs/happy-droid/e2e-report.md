@@ -1,5 +1,32 @@
 # happy-droid E2E Report
 
+## 2026-07-16 - P1 New Session Submission Lifecycle Test Plan
+
+Scope:
+
+- Exercise the production new-session submission coordinator across loading, spawn failure, initial-message failure, and success navigation outcomes.
+- Verify loading always clears after synchronous and asynchronous failures and that navigation occurs only after the first message is committed.
+- Rerun focused happy-app tests, typecheck, quick/app validation groups, and the Android debug APK build.
+
+Validation results:
+
+- PASS: `pnpm --filter happy-app exec vitest run sources/utils/newSessionSubmissionLifecycle.test.ts sources/utils/newSessionSubmissionRecovery.test.ts`
+  - 2 files / 16 tests, including 9 new lifecycle tests.
+- PASS: `pnpm --filter happy-app typecheck`
+- PASS: `node scripts/happy-droid-validate.cjs --run --group quick`
+  - Frozen install, happy-wire build, happy-app typecheck, 55 attachment tests, and 6 Android/E2E recorder tests passed.
+- PASS: `node scripts/happy-droid-validate.cjs --run --group app`
+  - 69 files / 766 tests passed; the new lifecycle suite was discovered by the full app gate.
+- PASS: `node scripts/happy-droid-validate.cjs --run --only android-debug-apk`
+  - Gradle `:app:assembleDebug` completed successfully with 1215 actionable tasks.
+  - APK: `packages/happy-app/android/app/build/outputs/apk/debug/app-debug.apk` (447 MiB).
+  - SHA-256: `aa1963ac7ac55ae8fc6841182d5965b4f32f37a840e6066ae2f547c783070aeb`.
+
+E2E boundary:
+
+- PASS at the production coordinator boundary: the real route calls the tested coordinator, which drives loading, spawn result handling, first-message commit gating, and navigation callbacks.
+- No live remote machine/session was created for this unit-test task; no device or backend state was mutated.
+
 ## 2026-07-03 - P0 pnpm Baseline Rebuild
 
 Environment probes:

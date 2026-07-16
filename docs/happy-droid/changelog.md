@@ -1,5 +1,12 @@
 # happy-droid Changelog
 
+## 2026-07-16 - New Session Submission Lifecycle Tests
+
+- Started P1 coverage for the new-session submission loading, failure, and success lifecycle.
+- `SUPERVISOR_TASK.md` remains absent in this checkout; root `outline.md`, `CHANGELOG.md`, and the ADR/debug indexes were reviewed before implementation.
+- Planned coverage: production submission coordination, loading cleanup, spawn failure handling, first-message failure without navigation, successful navigation, focused tests, happy-app typecheck, quick/app validation, and Android build verification.
+- Added a production submission coordinator plus unit coverage proving loading cleanup, failure retention, directory-approval delegation, first-message navigation gating, and successful completion ordering.
+
 ## 2026-07-04 - Server URL Chain Validation
 
 - Started P0 validation for `EXPO_PUBLIC_HAPPY_SERVER_URL` and `serverConfig` backend URL resolution.
